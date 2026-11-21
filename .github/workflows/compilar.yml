@@ -1,0 +1,46 @@
+# Compila el programa con Visual Studio (MSVC, 64 bits) y ejecuta las pruebas en Linux.
+# El programa compilado queda como "artifact" descargable en la pestaña Actions de GitHub.
+name: Compilar
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  pruebas:
+    name: Pruebas (Linux + SQLite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar dependencias
+        run: sudo apt-get update && sudo apt-get install -y unixodbc-dev libsqliteodbc
+      - name: Compilar
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j 4
+      - name: Ejecutar pruebas
+        run: ./build/pruebas
+      - name: Verificar plantillas de Excel
+        run: |
+          pip install openpyxl
+          ./build/pruebas --nombres | python tools/verificar_plantillas.py
+
+  windows:
+    name: Programa de Windows (MSVC x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar
+        run: cmake -S . -B build -A x64 -DBU_PRUEBAS=ON
+      - name: Compilar
+        run: cmake --build build --config Release
+      - name: Preparar carpeta del programa
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build/Release/BeneficioUnimax.exe dist/
+          Copy-Item build/Release/pruebas.exe dist/
+          Copy-Item -Recurse plantillas dist/plantillas
+          Copy-Item README.md dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BeneficioUnimax-windows-x64
+          path: dist
