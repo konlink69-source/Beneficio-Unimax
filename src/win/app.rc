@@ -188,7 +188,9 @@ BEGIN
     EDITTEXT        IDC_P_LB3, 110, 86, 80, 14, NUM
     EDITTEXT        IDC_P_QQ3, 200, 86, 90, 14, NUM
     PUSHBUTTON      "Guardar precios", IDC_P_GUARDAR, 110, 106, 80, 16
-    LTEXT           "El precio del día se pone solo en cada comprobante de compra de esa fecha (y se puede cambiar en un comprobante en particular).\n\nPuede escribir el precio por libra o por quintal: el otro se calcula solo (1 quintal = 100 libras).\n\nDeje vacío el tipo de café que no se compre ese día.", IDC_STATIC, 316, 8, 238, 110
+    LTEXT           "El precio del día se pone solo en cada comprobante de compra de esa fecha (y se puede cambiar en un comprobante en particular).", IDC_STATIC, 316, 8, 238, 28
+    LTEXT           "Puede escribir el precio por libra o por quintal: el otro se calcula solo (1 quintal = 100 libras).", IDC_STATIC, 316, 40, 238, 20
+    LTEXT           "Deje vacío el tipo de café que no se compre ese día.", IDC_STATIC, 316, 64, 238, 10
     LTEXT           "Historial de precios (últimos 90 días):", IDC_STATIC, 8, 134, 200, 8
     CONTROL         "", IDC_P_LISTA, "SysListView32", LISTA, 6, 144, 548, 148
 END

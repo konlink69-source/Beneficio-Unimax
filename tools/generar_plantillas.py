@@ -60,8 +60,9 @@ class Hoja:
               ajustar=False, borde=False):
         c = self.texto(celda, None, negrita=negrita, tam=tam, alinear=alinear, combinar=combinar, color=color,
                        ajustar=ajustar)
-        if formato:
-            c.number_format = formato
+        # Sin formato numérico = celda de texto ("@"), para que Excel no convierta
+        # "000123" en 123 ni interprete como fórmula un texto que empiece con "=" o "-".
+        c.number_format = formato or "@"
         if borde:
             c.border = Border(bottom=DELGADA)
         self.nombre(nombre, celda)
@@ -186,9 +187,9 @@ def cierre_caja():
 
     filas = [
         ("Restante del día anterior (saldo inicial)", "SALDO_INICIAL", False),
-        ("+ Entradas del día", "INGRESOS", False),
-        ("− Salidas del día", "EGRESOS", False),
-        ("= Debe haber en caja", "ESPERADO", True),
+        ("Más: entradas del día", "INGRESOS", False),
+        ("Menos: salidas del día", "EGRESOS", False),
+        ("Debe haber en caja", "ESPERADO", True),
         ("Dinero contado en caja", "CONTADO", False),
         ("Diferencia (contado − debe haber)", "DIFERENCIA", True),
     ]
@@ -270,7 +271,7 @@ def reporte_deudas():
 def reporte_compras():
     wb, h = nuevo("Compras")
     ws = h.ws
-    h.anchos({"A": 9, "B": 11, "C": 28, "D": 17, "E": 17, "F": 12, "G": 12, "H": 15, "I": 12, "J": 15})
+    h.anchos({"A": 12, "B": 11, "C": 28, "D": 17, "E": 17, "F": 12, "G": 12, "H": 15, "I": 12, "J": 15})
     h.encabezado_empresa("J", "REPORTE DE COMPRAS DE CAFÉ")
     ws.merge_cells("A4:E4")
     h.etiqueta("F4", "Del:", alinear="right")

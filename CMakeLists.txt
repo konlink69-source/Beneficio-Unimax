@@ -34,6 +34,10 @@ endif()
 
 if(WIN32)
     target_link_libraries(bu_nucleo PUBLIC odbc32 odbccp32)
+    if(MSVC)
+        # odbccp32.lib usa funciones de stdio antiguas que desde VS 2015 están en esta biblioteca.
+        target_link_libraries(bu_nucleo PUBLIC legacy_stdio_definitions)
+    endif()
 else()
     find_package(ODBC REQUIRED)
     target_link_libraries(bu_nucleo PUBLIC ODBC::ODBC)
