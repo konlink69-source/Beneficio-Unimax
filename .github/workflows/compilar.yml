@@ -1,6 +1,6 @@
 # Compila el programa con Visual Studio (MSVC, 64 bits), ejecuta las pruebas en Linux
-# y publica el programa listo para usar en "Releases" con un enlace fijo:
-#   https://github.com/<dueño>/<repositorio>/releases/latest/download/BeneficioUnimax-windows-x64.zip
+# y publica el programa listo para usar en "Releases" con un enlace fijo (un solo .exe):
+#   https://github.com/<dueño>/<repositorio>/releases/latest/download/BeneficioUnimax.exe
 name: Compilar
 
 on:
@@ -68,20 +68,26 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           cat > notas.md <<'NOTAS'
-          Programa listo para usar en Windows 10/11 de 64 bits (con Office de 64 bits: Excel y Access).
+          **Para abrir el programa:** descargue **`BeneficioUnimax.exe`** (abajo, en *Assets*) y ábralo.
+          No hay que descomprimir nada: las plantillas de Excel van dentro del programa.
 
-          **Instalación**
-          1. Descargue `BeneficioUnimax-windows-x64.zip` (abajo, en *Assets*).
-          2. Clic derecho en el .zip → *Extraer todo...* → por ejemplo en `C:\BeneficioUnimax`.
-          3. Abra `BeneficioUnimax.exe`. Si Windows muestra *"Windows protegió su PC"*, haga clic en
-             *Más información* → *Ejecutar de todas formas* (el programa no tiene firma digital comercial).
-          4. Opcional: ejecute `pruebas.exe` para comprobar que el controlador de Access de su Office funciona.
+          1. Al terminar la descarga, haga clic en **Abrir archivo** (en la lista de descargas del navegador).
+          2. Si Windows muestra *"Windows protegió su PC"*, haga clic en *Más información* → *Ejecutar de todas formas*
+             (el programa no tiene firma digital comercial). Si el navegador avisa que el archivo "no se descarga
+             con frecuencia", elija *Conservar*.
+          3. El programa pregunta si desea instalarlo: elija **Sí** y se crea el ícono **Beneficio Unimax** en el
+             escritorio. De ahí en adelante ábralo con doble clic en ese ícono.
 
-          Mantenga `BeneficioUnimax.exe` y la carpeta `plantillas` juntos. Sus datos se guardan en
-          `Documentos\BeneficioUnimax` y no se borran al actualizar el programa.
+          Requisitos: Windows 10/11 de 64 bits con Office de 64 bits (Excel y Access).
+          Para actualizar, descargue y abra el nuevo `BeneficioUnimax.exe` y elija **Sí**: sus datos
+          (en `Documentos\BeneficioUnimax`) no cambian.
+
+          Otros archivos: `pruebas.exe` comprueba que el controlador de Access de su Office funciona;
+          el .zip trae lo mismo junto con el manual (README).
           NOTAS
           gh release delete ultima-version --yes --cleanup-tag || true
-          gh release create ultima-version BeneficioUnimax-windows-x64.zip \
+          gh release create ultima-version \
+            BeneficioUnimax/BeneficioUnimax.exe BeneficioUnimax/pruebas.exe BeneficioUnimax-windows-x64.zip \
             --target "$GITHUB_SHA" --latest \
             --title "Beneficio Unimax: última versión ($(date -u +%Y-%m-%d))" \
             --notes-file notas.md

@@ -5,6 +5,7 @@
 //   /recordatorio       solo muestra el aviso de deudas (lo usa la tarea programada de Windows)
 //   /probar             junto con /recordatorio: muestra el aviso aunque no haya pendientes
 //   /verrecordatorio    abre el programa mostrando el recordatorio del día
+//   /noinstalar         no pregunta si se desea instalar (por ejemplo, al probarlo desde Visual Studio)
 #include "win/App.h"
 
 #include <shellapi.h>
@@ -13,6 +14,7 @@
 #include <memory>
 
 #include "win/Avisos.h"
+#include "win/Instalacion.h"
 #include "win/Paginas.h"
 #include "win/resource.h"
 
@@ -77,6 +79,34 @@ bool crearContenido(HWND h) {
     return true;
 }
 
+void instalarDesdeMenu(HWND h) {
+    std::string mensaje;
+    const bool desdeOtraCarpeta = !ejecutandoDesdeInstalacion(App::instancia().rutas().exe);
+    if (!instalar(App::instancia().rutas().exe, mensaje)) {
+        mostrarError(h, mensaje);
+        return;
+    }
+    if (!mensaje.empty()) {
+        mostrarAviso(h, mensaje);
+        return;
+    }
+    mostrarInfo(h, desdeOtraCarpeta
+                       ? "Listo. Se creó el ícono \"Beneficio Unimax\" en el escritorio. Cierre esta ventana y, de "
+                         "ahora en adelante, abra el programa con ese ícono."
+                       : "Listo. El ícono \"Beneficio Unimax\" está en el escritorio y en el menú Inicio.");
+}
+
+void despuesDeInstalar(HWND h) {
+    // Si el aviso diario ya estaba activo, se vuelve a crear para que use el programa instalado.
+    if (avisoWindowsActivo()) {
+        std::string error;
+        activarAvisoWindows(repo().config("HoraAviso", "07:30"), error);
+    }
+    mostrarInfo(h, "Beneficio Unimax quedó instalado.\n\nDe ahora en adelante ábralo con el ícono \"Beneficio "
+                   "Unimax\" del escritorio (también está en el menú Inicio). Ya puede borrar el archivo que "
+                   "descargó.");
+}
+
 void acercaDe(HWND h) {
     const Rutas& r = App::instancia().rutas();
     mostrarInfo(h, "Beneficio Unimax 1.0\nContabilidad de compra y venta de café (uva, pergamino húmedo y seco).\n\n"
@@ -120,6 +150,9 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case IDM_PLANTILLAS:
                     abrirCarpeta(App::instancia().rutas().plantillas);
                     return 0;
+                case IDM_INSTALAR:
+                    instalarDesdeMenu(h);
+                    return 0;
                 case IDM_RECORDATORIO:
                     App::instancia().mostrarRecordatorio(h, true);
                     return 0;
@@ -134,6 +167,7 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             }
             break;
         case WM_APP_INICIO:
+            if (lp != 0) intentar(h, [&] { despuesDeInstalar(h); });
             App::instancia().mostrarRecordatorio(h, wp != 0);
             if (g.actual >= 0) mostrarPagina(g.actual);  // refresca por si cambió algo
             return 0;
@@ -157,13 +191,15 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    bool modoAviso = false, probar = false, verRecordatorio = false;
+    bool modoAviso = false, probar = false, verRecordatorio = false, recienInstalado = false, noInstalar = false;
     std::wstring carpetaDatos;
     for (int i = 1; i < argc; ++i) {
         const std::wstring a = argv[i];
         if (_wcsicmp(a.c_str(), L"/recordatorio") == 0) modoAviso = true;
         else if (_wcsicmp(a.c_str(), L"/probar") == 0) probar = true;
         else if (_wcsicmp(a.c_str(), L"/verrecordatorio") == 0) verRecordatorio = true;
+        else if (_wcsicmp(a.c_str(), L"/instalado") == 0) recienInstalado = true;
+        else if (_wcsicmp(a.c_str(), L"/noinstalar") == 0) noInstalar = true;
         else if (_wcsicmp(a.c_str(), L"/datos") == 0 && i + 1 < argc) carpetaDatos = argv[++i];
     }
     LocalFree(argv);
@@ -177,9 +213,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     App& app = App::instancia();
     app.hInst = hInst;
 
+    HANDLE instancia = nullptr;
     if (!modoAviso) {
         // Una sola ventana del programa: si ya está abierto, se trae al frente.
-        CreateMutexW(nullptr, TRUE, L"BeneficioUnimax.InstanciaUnica");
+        instancia = CreateMutexW(nullptr, TRUE, L"BeneficioUnimax.InstanciaUnica");
         if (GetLastError() == ERROR_ALREADY_EXISTS) {
             if (HWND otra = FindWindowW(CLASE_VENTANA, nullptr)) {
                 ShowWindow(otra, SW_RESTORE);
@@ -188,6 +225,36 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
             }
             CoUninitialize();
             return 0;
+        }
+
+        // Abierto desde Descargas u otra carpeta: se ofrece instalarlo con un ícono en el escritorio.
+        wchar_t exe[MAX_PATH];
+        GetModuleFileNameW(nullptr, exe, MAX_PATH);
+        if (!noInstalar && !recienInstalado && !ejecutandoDesdeInstalacion(exe) && !noPreguntarInstalacion()) {
+            const int respuesta = MessageBoxW(
+                nullptr,
+                L"¿Desea instalar Beneficio Unimax en esta computadora?\n\n"
+                L"Se creará un ícono en el escritorio para abrir el programa con doble clic, sin volver a "
+                L"descargarlo. Si ya estaba instalado, se actualizará a esta versión. Sus datos no cambian.\n\n"
+                L"(Si elige No, el programa se abre igual y no se vuelve a preguntar; puede instalarlo después "
+                L"desde el menú Archivo.)",
+                L"Beneficio Unimax", MB_YESNO | MB_ICONQUESTION);
+            if (respuesta == IDYES) {
+                std::string mensaje;
+                if (instalar(exe, mensaje)) {
+                    if (!mensaje.empty()) MessageBoxW(nullptr, W(mensaje).c_str(), L"Beneficio Unimax", MB_ICONWARNING);
+                    std::wstring argumentos = L"/instalado";
+                    if (!carpetaDatos.empty()) argumentos += L" /datos \"" + carpetaDatos + L"\"";
+                    CloseHandle(instancia);  // para que la copia instalada pueda abrirse
+                    ShellExecuteW(nullptr, L"open", exeInstalado().c_str(), argumentos.c_str(),
+                                  carpetaInstalacion().c_str(), SW_SHOWNORMAL);
+                    CoUninitialize();
+                    return 0;
+                }
+                MessageBoxW(nullptr, W(mensaje).c_str(), L"Beneficio Unimax", MB_ICONERROR);
+            } else {
+                guardarNoPreguntarInstalacion();
+            }
         }
     }
 
@@ -224,7 +291,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     }
     ShowWindow(h, SW_SHOWMAXIMIZED);
     UpdateWindow(h);
-    PostMessageW(h, WM_APP_INICIO, verRecordatorio ? 1 : 0, 0);
+    PostMessageW(h, WM_APP_INICIO, verRecordatorio ? 1 : 0, recienInstalado ? 1 : 0);
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {

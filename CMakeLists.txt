@@ -56,6 +56,7 @@ if(WIN32)
         src/win/Util.cpp
         src/win/Excel.cpp
         src/win/Avisos.cpp
+        src/win/Instalacion.cpp
         src/win/Dialogos.cpp
         src/win/Paginas.cpp
         src/win/PaginaFactura.cpp
@@ -69,7 +70,7 @@ if(WIN32)
         src/win/PaginaConfiguracion.cpp
         src/win/app.rc
     )
-    target_link_libraries(BeneficioUnimax PRIVATE bu_nucleo comctl32 ole32 oleaut32 uuid shell32 shlwapi)
+    target_link_libraries(BeneficioUnimax PRIVATE bu_nucleo comctl32 ole32 oleaut32 uuid shell32 shlwapi advapi32)
     if(MSVC)
         # El manifiesto (estilos visuales y DPI) va dentro de app.rc.
         target_link_options(BeneficioUnimax PRIVATE /MANIFEST:NO)

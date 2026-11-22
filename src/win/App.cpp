@@ -6,6 +6,7 @@
 
 #include "db/Esquema.h"
 #include "win/Dialogos.h"
+#include "win/resource.h"
 
 namespace bu::win {
 
@@ -45,6 +46,36 @@ void copiarPlantillas(const std::wstring& origen, const std::wstring& destino) {
     } while (FindNextFileW(h, &fd));
     FindClose(h);
 }
+// Escribe las plantillas incluidas dentro del .exe que todavía no estén en la carpeta.
+void extraerPlantillasIncluidas(const std::wstring& destino) {
+    struct Incluida {
+        int id;
+        const wchar_t* archivo;
+    };
+    static const Incluida plantillas[] = {
+        {IDR_PLT_FACTURA, L"Factura.xlsx"},         {IDR_PLT_CIERRE_CAJA, L"CierreCaja.xlsx"},
+        {IDR_PLT_ESTADO_CUENTA, L"EstadoCuenta.xlsx"}, {IDR_PLT_DEUDAS, L"ReporteDeudas.xlsx"},
+        {IDR_PLT_COMPRAS, L"ReporteCompras.xlsx"},  {IDR_PLT_VENTAS, L"ReporteVentas.xlsx"},
+        {IDR_PLT_CAJA, L"ReporteCaja.xlsx"},
+    };
+    HMODULE modulo = GetModuleHandleW(nullptr);
+    for (const auto& p : plantillas) {
+        const std::wstring ruta = destino + L"\\" + p.archivo;
+        if (existeArchivo(ruta)) continue;
+        HRSRC recurso = FindResourceW(modulo, MAKEINTRESOURCEW(p.id), MAKEINTRESOURCEW(10));  // RT_RCDATA
+        if (!recurso) continue;
+        HGLOBAL cargado = LoadResource(modulo, recurso);
+        const void* datos = cargado ? LockResource(cargado) : nullptr;
+        const DWORD tamano = SizeofResource(modulo, recurso);
+        if (!datos || !tamano) continue;
+        HANDLE f = CreateFileW(ruta.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (f == INVALID_HANDLE_VALUE) continue;
+        DWORD escritos = 0;
+        const BOOL ok = WriteFile(f, datos, tamano, &escritos, nullptr);
+        CloseHandle(f);
+        if (!ok || escritos != tamano) DeleteFileW(ruta.c_str());
+    }
+}
 }  // namespace
 
 bool App::iniciar(const std::wstring& carpetaDatos, std::string& error) {
@@ -63,6 +94,7 @@ bool App::iniciar(const std::wstring& carpetaDatos, std::string& error) {
     crearCarpetas(rutas_.documentos);
     crearCarpetas(rutas_.respaldos);
     copiarPlantillas(rutas_.carpetaExe + L"\\plantillas", rutas_.plantillas);
+    extraerPlantillasIncluidas(rutas_.plantillas);
 
     if (!existeArchivo(rutas_.baseDatos)) {
         const std::string e = db::crearArchivoAccess(rutas_.baseDatos);

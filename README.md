@@ -70,19 +70,24 @@ cmake --build build --config Release
 # Resultado: build\Release\BeneficioUnimax.exe
 ```
 
-**Sin compilar (descarga directa):** cada vez que se suben cambios a GitHub, el programa se compila
-con Visual Studio y se publica en *Releases*. Este enlace siempre descarga la última versión:
+**Sin compilar (descarga directa, un solo archivo):** cada vez que se suben cambios a GitHub, el
+programa se compila con Visual Studio y se publica en *Releases*. Este enlace siempre descarga la última versión:
 
-<https://github.com/konlink69-source/Beneficio-Unimax/releases/latest/download/BeneficioUnimax-windows-x64.zip>
+<https://github.com/konlink69-source/Beneficio-Unimax/releases/latest/download/BeneficioUnimax.exe>
 
-Descomprima el .zip y abra `BeneficioUnimax.exe`. Si Windows muestra *"Windows protegió su PC"*, haga clic en
-*Más información → Ejecutar de todas formas*: el programa no tiene firma digital comercial.
+1. Al terminar la descarga, haga clic en **Abrir archivo**. No hay que descomprimir nada: las plantillas de Excel van dentro del programa.
+2. Si Windows muestra *"Windows protegió su PC"*, haga clic en *Más información → Ejecutar de todas formas*. El programa no tiene firma digital comercial.
+3. El programa pregunta si desea instalarlo. Si elige **Sí**, se copia a `%LOCALAPPDATA%\Programs\BeneficioUnimax` (no requiere permisos de administrador) y se crea el ícono **Beneficio Unimax** en el escritorio y en el menú Inicio. Desde entonces se abre con doble clic en ese ícono.
+
+Para actualizar, descargue y abra el nuevo `.exe` y elija **Sí**; sus datos no cambian. Si eligió **No**, puede
+instalarlo después desde *Archivo → Instalar en esta computadora*.
 Mientras el repositorio sea privado, el enlace pide iniciar sesión en GitHub con una cuenta que tenga acceso.
 
 ### Instalarlo para el uso diario
 
-Copie `BeneficioUnimax.exe` **y la carpeta `plantillas`** a una carpeta fija, por ejemplo
-`C:\BeneficioUnimax\`. Luego haga clic derecho en el `.exe` → *Enviar a → Escritorio (crear acceso directo)*.
+Abra `BeneficioUnimax.exe` y responda **Sí** cuando pregunte si desea instalarlo: se crea el ícono en el
+escritorio. Al probarlo desde Visual Studio puede responder **No** (no se vuelve a preguntar) o abrirlo
+con el argumento `/noinstalar`.
 
 ---
 

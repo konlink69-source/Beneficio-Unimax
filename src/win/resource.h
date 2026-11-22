@@ -34,6 +34,16 @@
 #define IDM_RECORDATORIO 40004
 #define IDM_ACERCA 40005
 #define IDM_PLANTILLAS 40006
+#define IDM_INSTALAR 40007
+
+// ---------------------------------------------------------------- Plantillas de Excel incluidas en el .exe
+#define IDR_PLT_FACTURA 300
+#define IDR_PLT_CIERRE_CAJA 301
+#define IDR_PLT_ESTADO_CUENTA 302
+#define IDR_PLT_DEUDAS 303
+#define IDR_PLT_COMPRAS 304
+#define IDR_PLT_VENTAS 305
+#define IDR_PLT_CAJA 306
 
 // ---------------------------------------------------------------- Comprobante de compra
 #define IDC_F_DNI 1001

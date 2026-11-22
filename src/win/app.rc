@@ -12,6 +12,16 @@ IDI_APP ICON "app.ico"
 
 1 24 "app.manifest"
 
+// Plantillas de Excel dentro del programa: así basta con descargar un solo .exe.
+// Se copian a Documentos\BeneficioUnimax\Plantillas la primera vez.
+IDR_PLT_FACTURA       RCDATA "../../plantillas/Factura.xlsx"
+IDR_PLT_CIERRE_CAJA   RCDATA "../../plantillas/CierreCaja.xlsx"
+IDR_PLT_ESTADO_CUENTA RCDATA "../../plantillas/EstadoCuenta.xlsx"
+IDR_PLT_DEUDAS        RCDATA "../../plantillas/ReporteDeudas.xlsx"
+IDR_PLT_COMPRAS       RCDATA "../../plantillas/ReporteCompras.xlsx"
+IDR_PLT_VENTAS        RCDATA "../../plantillas/ReporteVentas.xlsx"
+IDR_PLT_CAJA          RCDATA "../../plantillas/ReporteCaja.xlsx"
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 1,0,0,0
  PRODUCTVERSION 1,0,0,0
@@ -45,6 +55,7 @@ BEGIN
         MENUITEM "&Respaldar base de datos...", IDM_RESPALDAR
         MENUITEM "Abrir carpeta de &datos", IDM_CARPETA
         MENUITEM "Abrir carpeta de &plantillas de Excel", IDM_PLANTILLAS
+        MENUITEM "&Instalar en esta computadora (ícono en el escritorio)", IDM_INSTALAR
         MENUITEM SEPARATOR
         MENUITEM "&Salir", IDM_SALIR
     END
