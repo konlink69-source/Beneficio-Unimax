@@ -152,9 +152,9 @@ Las plantillas originales se generan con `python tools/generar_plantillas.py` (r
 
 ### Logo
 
-El logo está inspirado en la fachada del beneficio: muro crema, marco café, techo de lámina, "BENEFICIO DE CAFÉ"
-en negro y "UNIMAX" en letra gruesa inclinada. Aparece en el ícono del programa, en el encabezado de la ventana y
-en todos los comprobantes y reportes de Excel. Los archivos están en la carpeta `logo/`:
+El logo toma el texto del rótulo del beneficio ("BENEFICIO DE CAFÉ" en negro y "UNIMAX" en letra gruesa
+inclinada color café) con detalles discretos de granos de café. Aparece en el ícono del programa, en el encabezado
+de la ventana y en todos los comprobantes y reportes de Excel. Los archivos están en la carpeta `logo/`:
 
 | Archivo | Uso |
 |---|---|

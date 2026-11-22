@@ -50,8 +50,8 @@ void copiarPlantillas(const std::wstring& origen, const std::wstring& destino) {
 }
 // Versión de las plantillas incluidas en el programa. Al subirla, las plantillas que el usuario
 // tenga se guardan en "Plantillas\Anteriores" y se ponen las nuevas.
-//   1 = primeras plantillas    2 = con el logo de Unimax
-constexpr int VERSION_PLANTILLAS = 2;
+//   1 = primeras plantillas    2 = con logo (fachada)    3 = logo de texto con granos de café
+constexpr int VERSION_PLANTILLAS = 3;
 
 void actualizarPlantillasSiHaceFalta(const std::wstring& carpeta) {
     const std::wstring marca = carpeta + L"\\version.txt";

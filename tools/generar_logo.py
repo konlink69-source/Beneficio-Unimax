@@ -1,6 +1,6 @@
-"""Genera el logo de Beneficio Unimax inspirado en la fachada del beneficio:
-muro crema con marco café, techo a dos aguas, "BENEFICIO DE CAFÉ" en negro y
-"UNIMAX" en letra gruesa inclinada color café.
+"""Genera el logo de Beneficio Unimax: solo texto, como el rótulo de la fachada
+("BENEFICIO DE CAFÉ" en negro y "UNIMAX" en letra gruesa inclinada color café),
+con detalles discretos de granos de café.
 
 Archivos que genera:
   logo/logo-unimax.svg        logo principal (vectorial, para imprenta o rótulos)
@@ -31,10 +31,25 @@ FUENTES = Path("/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF")
 NEGRA = FUENTES / "Roboto-Black.ttf"
 NEGRA_ITALICA = FUENTES / "Roboto-BlackItalic.ttf"
 
-CAFE = "#4A1E1B"      # café de los pilares y de "UNIMAX"
+CAFE = "#4A1E1B"      # "UNIMAX" (café oscuro del rótulo)
 NEGRO = "#1B1B1B"     # "BENEFICIO DE CAFÉ"
-CREMA = "#F1EADB"     # muro
-TECHO = "#6F787F"     # lámina del techo
+GRANO = "#8A5A3C"     # granos de café (tono más claro, para que sean discretos)
+CREMA = "#F1EADB"     # fondo del ícono y del encabezado del programa
+
+# Grano de café de 2 unidades de alto centrado en (0, 0): un óvalo con la hendidura en "S"
+# recortada (máscara), así se ve bien sobre fondo transparente.
+DEFS_GRANO = (
+    '<defs><mask id="hendidura" maskContentUnits="userSpaceOnUse" x="-2" y="-2" width="4" height="4">'
+    '<rect x="-2" y="-2" width="4" height="4" fill="#fff"/>'
+    '<path d="M0.05,-1.02 C-0.42,-0.42 0.42,0.42 -0.05,1.02" fill="none" stroke="#000" stroke-width="0.16" '
+    'stroke-linecap="round"/></mask>'
+    '<g id="grano"><ellipse rx="0.66" ry="1" mask="url(#hendidura)"/></g></defs>'
+)
+
+
+def grano(x, y, alto, angulo, color=GRANO):
+    return (f'<use href="#grano" fill="{color}" '
+            f'transform="translate({x:.1f},{y:.1f}) rotate({angulo}) scale({alto / 2:.2f})"/>')
 
 
 def texto_svg(fuente, texto, tam, centro_x, base_y, espaciado=0.0, color=NEGRO):
@@ -54,23 +69,26 @@ def texto_svg(fuente, texto, tam, centro_x, base_y, espaciado=0.0, color=NEGRO):
 
 
 def logo_svg():
-    piezas = []
-    # Muro crema (el borde superior queda bajo el techo)
-    piezas.append(f'<polygon fill="{CREMA}" points="112,170 600,100 1088,170 1088,440 112,440"/>')
-    # Texto
-    linea1, ancho1 = texto_svg(NEGRA, "BENEFICIO DE CAFÉ", 60, 600, 252, espaciado=7, color=NEGRO)
-    linea2, ancho2 = texto_svg(NEGRA_ITALICA, "UNIMAX", 172, 600, 396, espaciado=8, color=CAFE)
-    assert ancho1 < 840 and ancho2 < 860, (ancho1, ancho2)
-    piezas += [linea1, linea2]
-    # Marco: pilares y viga, como la fachada
-    piezas.append(f'<rect x="112" y="150" width="42" height="300" fill="{CAFE}"/>')
-    piezas.append(f'<rect x="1046" y="150" width="42" height="300" fill="{CAFE}"/>')
-    piezas.append(f'<rect x="112" y="414" width="976" height="36" fill="{CAFE}"/>')
-    # Techo de lámina a dos aguas (poca pendiente) y su cenefa café
-    piezas.append(f'<polygon fill="{TECHO}" points="40,152 600,70 1160,152 1160,178 600,96 40,178"/>')
-    piezas.append(f'<polygon fill="{CAFE}" points="112,167.5 600,96 1088,167.5 1088,181.5 600,110 112,181.5"/>')
+    cx = 600
+    linea1, ancho1 = texto_svg(NEGRA, "BENEFICIO DE CAFÉ", 58, cx, 118, espaciado=9, color=NEGRO)
+    linea2, ancho2 = texto_svg(NEGRA_ITALICA, "UNIMAX", 210, cx, 318, espaciado=10, color=CAFE)
+    piezas = [DEFS_GRANO, linea1, linea2]
+    # Un grano a cada lado de "BENEFICIO DE CAFÉ"
+    sep = ancho1 / 2 + 46
+    piezas.append(grano(cx - sep, 97, 46, -32))
+    piezas.append(grano(cx + sep, 97, 46, 32))
+    # Línea fina bajo "UNIMAX" interrumpida por tres granos pequeños
+    y = 352
+    mitad = ancho2 / 2
+    piezas.append(f'<rect x="{cx - mitad:.1f}" y="{y - 2.5}" width="{mitad - 70:.1f}" height="5" rx="2.5" fill="{CAFE}"/>')
+    piezas.append(f'<rect x="{cx + 70:.1f}" y="{y - 2.5}" width="{mitad - 70:.1f}" height="5" rx="2.5" fill="{CAFE}"/>')
+    for dx, ang in ((-38, -70), (0, 90), (38, 70)):
+        piezas.append(grano(cx + dx, y, 26, ang))
+    izquierda = cx - max(sep + 30, mitad) - 24
+    ancho = 2 * (cx - izquierda)
     cuerpo = "\n  ".join(piezas)
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="24 54 1152 412" width="1152" height="412">\n'
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
+            f'viewBox="{izquierda:.0f} 40 {ancho:.0f} 340" width="{ancho:.0f}" height="340">\n'
             f'  <title>Beneficio de Café Unimax</title>\n  {cuerpo}\n</svg>\n')
 
 
@@ -80,15 +98,11 @@ def icono_svg(pequeno=False):
         u, _ = texto_svg(NEGRA_ITALICA, "U", 400, 262, 404, color=CREMA)
         return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">'
                 f'<rect x="8" y="8" width="496" height="496" rx="88" fill="{CAFE}"/>{u}</svg>')
-    u, _ = texto_svg(NEGRA_ITALICA, "U", 300, 262, 398, color=CAFE)
+    # U grande con un grano de café dentro de su curva.
+    u, _ = texto_svg(NEGRA_ITALICA, "U", 420, 262, 432, color=CAFE)
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">'
-            f'<rect x="8" y="8" width="496" height="496" rx="72" fill="{CREMA}"/>'
-            f'{u}'
-            f'<rect x="70" y="150" width="44" height="304" fill="{CAFE}"/>'
-            f'<rect x="398" y="150" width="44" height="304" fill="{CAFE}"/>'
-            f'<rect x="70" y="414" width="372" height="40" fill="{CAFE}"/>'
-            f'<polygon fill="{CAFE}" points="30,170 256,56 482,170 482,206 256,92 30,206"/>'
-            f'</svg>')
+            f'{DEFS_GRANO}<rect x="8" y="8" width="496" height="496" rx="88" fill="{CREMA}"/>{u}'
+            f'{grano(277, 222, 72, 13)}</svg>')
 
 
 def rasterizar(svg, ancho, fondo=None):
