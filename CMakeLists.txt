@@ -5,6 +5,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Visual Studio: incluir la biblioteca de C++ dentro del .exe, para que el
+# programa abra en cualquier PC sin instalar "Visual C++ Redistributable".
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 # ---------------------------------------------------------------- Núcleo
 # Lógica del negocio y base de datos (no depende de las ventanas).
 add_library(bu_nucleo STATIC

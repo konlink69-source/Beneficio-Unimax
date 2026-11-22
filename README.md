@@ -70,8 +70,14 @@ cmake --build build --config Release
 # Resultado: build\Release\BeneficioUnimax.exe
 ```
 
-**Sin compilar:** cada vez que se suben cambios a GitHub, la pestaña **Actions** compila el programa con
-Visual Studio. Abra la última ejecución de **Compilar** y descargue el archivo **BeneficioUnimax-windows-x64**.
+**Sin compilar (descarga directa):** cada vez que se suben cambios a GitHub, el programa se compila
+con Visual Studio y se publica en *Releases*. Este enlace siempre descarga la última versión:
+
+<https://github.com/konlink69-source/Beneficio-Unimax/releases/latest/download/BeneficioUnimax-windows-x64.zip>
+
+Descomprima el .zip y abra `BeneficioUnimax.exe`. Si Windows muestra *"Windows protegió su PC"*, haga clic en
+*Más información → Ejecutar de todas formas*: el programa no tiene firma digital comercial.
+Mientras el repositorio sea privado, el enlace pide iniciar sesión en GitHub con una cuenta que tenga acceso.
 
 ### Instalarlo para el uso diario
 
