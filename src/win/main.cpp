@@ -27,9 +27,72 @@ struct Ventana {
     HWND pestanas = nullptr;
     std::array<std::unique_ptr<Pagina>, NUM_PAGINAS> paginas;
     int actual = -1;
+    HBITMAP logo = nullptr;
+    int logoAncho = 0;
+    int logoAlto = 0;
 };
 
 Ventana g;
+
+// Convierte píxeles de diseño (a 96 ppp) a píxeles de la pantalla.
+int escala(int valor) {
+    static const int ppp = [] {
+        HDC dc = GetDC(nullptr);
+        const int d = GetDeviceCaps(dc, LOGPIXELSY);
+        ReleaseDC(nullptr, dc);
+        return d;
+    }();
+    return MulDiv(valor, ppp, 96);
+}
+
+int altoEncabezado() { return escala(64); }
+
+std::string fechaLarga(const Fecha& f) {
+    static const char* const DIAS[] = {"domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"};
+    const long n = f.numeroDia();  // el 1970-01-01 fue jueves
+    return std::string(DIAS[((n % 7) + 7 + 4) % 7]) + " " + f.texto();
+}
+
+// Encabezado con el logo, en los colores de la fachada: crema con una viga café abajo.
+void pintarEncabezado(HWND h, HDC dc) {
+    RECT r;
+    GetClientRect(h, &r);
+    const int alto = altoEncabezado();
+    const int viga = escala(5);
+    RECT banda{0, 0, r.right, alto - viga};
+    HBRUSH crema = CreateSolidBrush(RGB(241, 234, 219));
+    FillRect(dc, &banda, crema);
+    DeleteObject(crema);
+    RECT rv{0, alto - viga, r.right, alto};
+    HBRUSH cafe = CreateSolidBrush(COLOR_CAFE);
+    FillRect(dc, &rv, cafe);
+    DeleteObject(cafe);
+
+    int x = escala(10);
+    if (g.logo && g.logoAlto > 0) {
+        const int la = alto - viga - escala(8);
+        const int an = MulDiv(g.logoAncho, la, g.logoAlto);
+        HDC mem = CreateCompatibleDC(dc);
+        HGDIOBJ anterior = SelectObject(mem, g.logo);
+        SetStretchBltMode(dc, HALFTONE);
+        SetBrushOrgEx(dc, 0, 0, nullptr);
+        StretchBlt(dc, x, escala(4), an, la, mem, 0, 0, g.logoAncho, g.logoAlto, SRCCOPY);
+        SelectObject(mem, anterior);
+        DeleteDC(mem);
+        x += an;
+    }
+    SetBkMode(dc, TRANSPARENT);
+    const int medio = (alto - viga) / 2 + escala(3);
+    RECT rt{x + escala(16), escala(4), r.right - escala(16), medio};
+    HGDIOBJ fuenteAnterior = SelectObject(dc, fuenteGrande());
+    SetTextColor(dc, COLOR_CAFE);
+    DrawTextW(dc, L"Contabilidad de compra de café", -1, &rt, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE | DT_END_ELLIPSIS);
+    RECT rf{rt.left, medio, rt.right, alto - viga};
+    SelectObject(dc, fuenteNormal());
+    SetTextColor(dc, COLOR_GRIS);
+    DrawTextW(dc, W("Hoy es " + fechaLarga(Fecha::hoy())).c_str(), -1, &rf, DT_RIGHT | DT_TOP | DT_SINGLELINE);
+    SelectObject(dc, fuenteAnterior);
+}
 
 HWND paginaActiva() { return g.actual >= 0 ? g.paginas[static_cast<size_t>(g.actual)]->hwnd() : nullptr; }
 
@@ -37,12 +100,17 @@ void ubicarPaginas(HWND h) {
     RECT r;
     GetClientRect(h, &r);
     const int margen = 4;
-    SetWindowPos(g.pestanas, nullptr, margen, margen, r.right - 2 * margen, r.bottom - 2 * margen, SWP_NOZORDER);
-    RECT area{0, 0, r.right - 2 * margen, r.bottom - 2 * margen};
+    const int arriba = altoEncabezado() + margen;
+    const int ancho = r.right - 2 * margen;
+    const int alto = r.bottom - arriba - margen;
+    SetWindowPos(g.pestanas, nullptr, margen, arriba, ancho, alto, SWP_NOZORDER);
+    RECT area{0, 0, ancho, alto};
     TabCtrl_AdjustRect(g.pestanas, FALSE, &area);
     for (auto& p : g.paginas)
-        SetWindowPos(p->hwnd(), HWND_TOP, area.left + margen, area.top + margen, area.right - area.left,
+        SetWindowPos(p->hwnd(), HWND_TOP, area.left + margen, area.top + arriba, area.right - area.left,
                      area.bottom - area.top, SWP_NOACTIVATE);
+    RECT encabezado{0, 0, r.right, altoEncabezado()};
+    InvalidateRect(h, &encabezado, FALSE);
 }
 
 void mostrarPagina(int indice) {
@@ -118,6 +186,14 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
         case WM_CREATE:
             App::instancia().ventana = h;
+            g.logo = static_cast<HBITMAP>(LoadImageW(App::instancia().hInst, MAKEINTRESOURCEW(IDB_LOGO), IMAGE_BITMAP,
+                                                     0, 0, LR_CREATEDIBSECTION));
+            if (g.logo) {
+                BITMAP bm{};
+                GetObjectW(g.logo, sizeof bm, &bm);
+                g.logoAncho = bm.bmWidth;
+                g.logoAlto = bm.bmHeight;
+            }
             if (!crearContenido(h)) {
                 MessageBoxW(h, L"No se pudieron crear las ventanas del programa.", L"Beneficio Unimax", MB_ICONERROR);
                 return -1;
@@ -128,6 +204,13 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_SIZE:
             if (g.pestanas) ubicarPaginas(h);
             return 0;
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC dc = BeginPaint(h, &ps);
+            pintarEncabezado(h, dc);
+            EndPaint(h, &ps);
+            return 0;
+        }
         case WM_GETMINMAXINFO: {
             auto* mm = reinterpret_cast<MINMAXINFO*>(lp);
             mm->ptMinTrackSize.x = 900;

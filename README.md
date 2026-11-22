@@ -1,3 +1,5 @@
+<p align="center"><img src="logo/logo-unimax.png" alt="Beneficio de Café Unimax" width="420"></p>
+
 # Beneficio Unimax: contabilidad de compra de café
 
 Programa de escritorio para Windows (C++) que lleva la contabilidad de un beneficio de café:
@@ -148,6 +150,21 @@ letras, columnas, agregar el logotipo, etc. Para que el programa siga sabiendo d
 
 Las plantillas originales se generan con `python tools/generar_plantillas.py` (requiere `openpyxl`).
 
+### Logo
+
+El logo está inspirado en la fachada del beneficio: muro crema, marco café, techo de lámina, "BENEFICIO DE CAFÉ"
+en negro y "UNIMAX" en letra gruesa inclinada. Aparece en el ícono del programa, en el encabezado de la ventana y
+en todos los comprobantes y reportes de Excel. Los archivos están en la carpeta `logo/`:
+
+| Archivo | Uso |
+|---|---|
+| `logo-unimax.svg` | Vectorial: para imprenta, rótulos o mantas (se puede agrandar sin perder calidad) |
+| `logo-unimax.png` | Alta resolución con fondo transparente (documentos, redes sociales) |
+| `icono-unimax.png` / `.svg` | Ícono cuadrado |
+
+Para cambiarlo, edite `tools/generar_logo.py` y ejecute `python tools/generar_logo.py` y luego
+`python tools/generar_plantillas.py`.
+
 ---
 
 ## 8. Problemas frecuentes
@@ -182,7 +199,8 @@ src/db/     ODBC (Access en Windows, SQLite en las pruebas), creación de tablas
 src/win/    Interfaz Win32: ventana con pestañas, diálogos (app.rc), Excel por COM, avisos.
 tests/      Pruebas automáticas (189 comprobaciones).
 plantillas/ Plantillas de Excel.
-tools/      Generadores de plantillas e icono, verificación de plantillas.
+tools/      Generadores del logo y de las plantillas, verificación de plantillas.
+logo/       Logo en SVG y PNG.
 ```
 
 **Tablas de Access:** `Clientes`, `PreciosDia`, `Facturas` + `FacturaDetalle` (comprobantes de compra),

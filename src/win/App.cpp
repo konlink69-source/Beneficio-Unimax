@@ -1,6 +1,8 @@
 #include "win/App.h"
 
 #include <commdlg.h>
+
+#include <cstdlib>
 #include <knownfolders.h>
 #include <shlobj.h>
 
@@ -46,6 +48,44 @@ void copiarPlantillas(const std::wstring& origen, const std::wstring& destino) {
     } while (FindNextFileW(h, &fd));
     FindClose(h);
 }
+// Versión de las plantillas incluidas en el programa. Al subirla, las plantillas que el usuario
+// tenga se guardan en "Plantillas\Anteriores" y se ponen las nuevas.
+//   1 = primeras plantillas    2 = con el logo de Unimax
+constexpr int VERSION_PLANTILLAS = 2;
+
+void actualizarPlantillasSiHaceFalta(const std::wstring& carpeta) {
+    const std::wstring marca = carpeta + L"\\version.txt";
+    int version = 0;
+    HANDLE f = CreateFileW(marca.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (f != INVALID_HANDLE_VALUE) {
+        char buf[16] = {0};
+        DWORD leidos = 0;
+        ReadFile(f, buf, sizeof buf - 1, &leidos, nullptr);
+        CloseHandle(f);
+        version = std::atoi(buf);
+    }
+    if (version >= VERSION_PLANTILLAS) return;
+
+    const std::wstring anteriores = carpeta + L"\\Anteriores";
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW((carpeta + L"\\*.xlsx").c_str(), &fd);
+    if (h != INVALID_HANDLE_VALUE) {
+        crearCarpetas(anteriores);
+        do {
+            MoveFileExW((carpeta + L"\\" + fd.cFileName).c_str(), (anteriores + L"\\" + fd.cFileName).c_str(),
+                        MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
+        } while (FindNextFileW(h, &fd));
+        FindClose(h);
+    }
+    f = CreateFileW(marca.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (f != INVALID_HANDLE_VALUE) {
+        const std::string texto = std::to_string(VERSION_PLANTILLAS);
+        DWORD escritos = 0;
+        WriteFile(f, texto.data(), static_cast<DWORD>(texto.size()), &escritos, nullptr);
+        CloseHandle(f);
+    }
+}
+
 // Escribe las plantillas incluidas dentro del .exe que todavía no estén en la carpeta.
 void extraerPlantillasIncluidas(const std::wstring& destino) {
     struct Incluida {
@@ -93,6 +133,7 @@ bool App::iniciar(const std::wstring& carpetaDatos, std::string& error) {
     crearCarpetas(rutas_.plantillas);
     crearCarpetas(rutas_.documentos);
     crearCarpetas(rutas_.respaldos);
+    actualizarPlantillasSiHaceFalta(rutas_.plantillas);
     copiarPlantillas(rutas_.carpetaExe + L"\\plantillas", rutas_.plantillas);
     extraerPlantillasIncluidas(rutas_.plantillas);
 

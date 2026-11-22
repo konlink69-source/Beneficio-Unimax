@@ -11,7 +11,12 @@ Uso:  python tools/generar_plantillas.py
 from pathlib import Path
 
 from openpyxl import Workbook
+from openpyxl.drawing.image import Image as ImagenExcel
+from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
+from openpyxl.drawing.xdr import XDRPositiveSize2D
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import column_index_from_string, get_column_letter
+from openpyxl.utils.units import pixels_to_EMU
 from openpyxl.workbook.defined_name import DefinedName
 
 CAFE = "5B3A29"
@@ -27,6 +32,8 @@ BORDE = Border(left=DELGADA, right=DELGADA, top=DELGADA, bottom=DELGADA)
 LINEA_FIRMA = Border(top=Side(style="thin", color="000000"))
 
 SALIDA = Path(__file__).resolve().parent.parent / "plantillas"
+# Logo (se genera con tools/generar_logo.py)
+LOGO = Path(__file__).resolve().parent.parent / "logo" / "logo-unimax-chico.png"
 
 
 class Hoja:
@@ -71,9 +78,39 @@ class Hoja:
     def etiqueta(self, celda, valor, combinar=None, alinear="left"):
         return self.texto(celda, valor, negrita=True, color=CAFE, alinear=alinear, combinar=combinar)
 
+    def px_columna(self, col):
+        ancho = self.ws.column_dimensions[get_column_letter(col)].width or 8.43
+        return int(ancho * 7 + 5)
+
+    def logo(self, col, desplazamiento_px, alto_px, fila_px=4):
+        """Inserta el logo con la esquina superior izquierda en la columna "col" (1 = A)."""
+        if not LOGO.exists():
+            return
+        img = ImagenExcel(str(LOGO))
+        ancho_px = round(img.width * alto_px / img.height)
+        img.width, img.height = ancho_px, alto_px
+        img.anchor = OneCellAnchor(
+            _from=AnchorMarker(col=col - 1, colOff=pixels_to_EMU(desplazamiento_px), row=0,
+                               rowOff=pixels_to_EMU(fila_px)),
+            ext=XDRPositiveSize2D(pixels_to_EMU(ancho_px), pixels_to_EMU(alto_px)))
+        self.ws.add_image(img)
+
+    def logo_derecha(self, ultima_col, alto_px=50):
+        """Logo en la esquina superior derecha, terminando en la columna "ultima_col"."""
+        if not LOGO.exists():
+            return
+        ancho_px = round(ImagenExcel(str(LOGO)).width * alto_px / ImagenExcel(str(LOGO)).height)
+        restante = ancho_px + 6
+        col = column_index_from_string(ultima_col)
+        while col > 1 and restante > self.px_columna(col):
+            restante -= self.px_columna(col)
+            col -= 1
+        self.logo(col, max(0, self.px_columna(col) - restante), alto_px)
+
     def encabezado_empresa(self, ultima_col, titulo, fila_titulo=4):
         self.campo("EMPRESA", "A1", negrita=True, tam=18, color=CAFE, combinar=f"A1:{ultima_col}1")
         self.campo("EMPRESA_DATOS", "A2", tam=9, color=GRIS, combinar=f"A2:{ultima_col}2")
+        self.logo_derecha(ultima_col)
         self.ws.row_dimensions[1].height = 28
         self.texto(f"A{fila_titulo}", titulo, negrita=True, tam=14)
 
@@ -110,8 +147,11 @@ def factura():
     wb, h = nuevo("Comprobante")
     ws = h.ws
     h.anchos({"A": 24, "B": 13, "C": 12, "D": 11, "E": 14, "F": 17})
-    h.campo("EMPRESA", "A1", negrita=True, tam=18, color=CAFE, combinar="A1:F1", alinear="center")
-    h.campo("EMPRESA_DATOS", "A2", tam=9, color=GRIS, combinar="A2:F2", alinear="center")
+    # Logo a la izquierda (filas 1 a 3) y datos de la empresa a la derecha.
+    h.logo(1, 2, 58, fila_px=3)
+    h.campo("EMPRESA", "B1", negrita=True, tam=18, color=CAFE, combinar="B1:F1", alinear="center")
+    h.campo("EMPRESA_DATOS", "B2", tam=9, color=GRIS, combinar="B2:F2", alinear="center", ajustar=True)
+    ws.row_dimensions[2].height = 24
     ws.row_dimensions[1].height = 28
     h.texto("A4", "COMPROBANTE DE COMPRA DE CAFÉ", negrita=True, tam=14, combinar="A4:D4")
     h.etiqueta("E4", "No.", alinear="right")

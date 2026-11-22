@@ -9,6 +9,7 @@
 LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_HONDURAS
 
 IDI_APP ICON "app.ico"
+IDB_LOGO BITMAP "logo_encabezado.bmp"
 
 1 24 "app.manifest"
 

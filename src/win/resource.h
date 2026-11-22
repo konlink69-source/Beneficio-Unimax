@@ -45,6 +45,9 @@
 #define IDR_PLT_VENTAS 305
 #define IDR_PLT_CAJA 306
 
+// Logo para el encabezado de la ventana
+#define IDB_LOGO 310
+
 // ---------------------------------------------------------------- Comprobante de compra
 #define IDC_F_DNI 1001
 #define IDC_F_BUSCAR 1002
