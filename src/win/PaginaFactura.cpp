@@ -5,6 +5,7 @@
 #include "win/App.h"
 #include "win/Dialogos.h"
 #include "win/Excel.h"
+#include "win/Impresion.h"
 #include "win/Paginas.h"
 #include "win/resource.h"
 
@@ -39,6 +40,14 @@ public:
                       {L"Precio por libra", 70, true},
                       {L"Precio por quintal", 74, true},
                       {L"Subtotal", 84, true}});
+        // Etiquetas del cliente grandes y en café; los campos con letra más grande.
+        for (int id : {IDC_F_LBL_DNI, IDC_F_LBL_NOMBRE, IDC_F_LBL_TEL}) {
+            ponerFuente(h_, id, fuenteEtiqueta());
+            colorTexto(id, COLOR_CAFE);
+        }
+        for (int id : {IDC_F_DNI, IDC_F_NOMBRE, IDC_F_TELEFONO}) ponerFuente(h_, id, fuente(tamanoLetra() * 11.0 / 9.0, false));
+        textoGuia(h_, IDC_F_DNI, L"DNI o nombre + Enter");
+        textoGuia(h_, IDC_F_NOMBRE, L"Nombre completo (o Enter para buscar)");
         ponerFuente(h_, IDC_F_TOTAL, fuenteGrande());
         ponerFuente(h_, IDC_F_NUMERO, fuenteNegrita());
         ponerFuente(h_, IDC_F_SUBTOTAL, fuenteNegrita());
@@ -110,9 +119,8 @@ public:
 
     void alAceptar() override {
         HWND foco = GetFocus();
-        if (cliente_.tieneFoco()) {
-            cliente_.buscar();
-            if (!vacio(h_, IDC_F_NOMBRE)) enfocar(h_, IDC_F_CANTIDAD);
+        if (cliente_.alPresionarEnter()) {
+            if (cliente_.hayCliente()) enfocar(h_, IDC_F_CANTIDAD);
         } else if (foco == GetDlgItem(h_, IDC_F_CANTIDAD) || foco == GetDlgItem(h_, IDC_F_GALONES) ||
                    foco == GetDlgItem(h_, IDC_F_PRECIO)) {
             agregarLinea(true);
@@ -309,14 +317,34 @@ private:
         if (!confirmar(h_, pregunta)) return;
         if (!intentar(h_, [&] { repo().registrarFactura(f); })) return;
         const long numero = f.numero;
-        if (imprimir) {
-            Documento doc;
-            if (intentar(h_, [&] { doc = docComprobanteCompra(repo().empresa(), *repo().facturaPorId(f.id), c); }))
-                generarYMostrar(h_, doc);
-        } else {
-            mostrarInfo(h_, "Comprobante No. " + numero6(numero) + " guardado.");
-        }
+        const long id = f.id;
         limpiar();
+        // Copia en PDF en la carpeta del cliente (Documentos\Facturas\<cliente>).
+        std::string avisoPdf;
+        if (repo().config("GuardarPdfComprobante", "1") == "1") {
+            try {
+                CursorEspera espera;
+                guardarPdfComprobante(id);
+            } catch (const std::exception& e) {
+                avisoPdf = std::string("\n\n(No se pudo guardar el PDF: ") + e.what() + ")";
+            }
+        }
+        if (imprimir) {
+            // Directo a la impresora, sin cuadros de diálogo.
+            try {
+                CursorEspera espera;
+                const std::wstring impresora = imprimirComprobante(id);
+                mostrarInfo(h_, "Comprobante No. " + numero6(numero) + " guardado e impreso en \"" + U(impresora) +
+                                    "\"." + avisoPdf);
+            } catch (const std::exception& e) {
+                if (confirmar(h_, "El comprobante No. " + numero6(numero) + " se guardó, pero no se pudo imprimir:\n" +
+                                      e.what() + "\n\n¿Desea verlo en pantalla?"))
+                    verComprobante(h_, id);
+            }
+        } else {
+            if (!avisoPdf.empty()) mostrarAviso(h_, "Comprobante guardado." + avisoPdf);
+            verComprobante(h_, id);  // se muestra dentro del programa
+        }
     }
 
     EntradaCliente cliente_;

@@ -5,6 +5,7 @@
 #include "win/Dialogos.h"
 #include "win/Excel.h"
 #include "win/Paginas.h"
+#include "win/Sesion.h"
 #include "win/resource.h"
 
 namespace bu::win {
@@ -143,6 +144,8 @@ private:
         c.direccion = texto(h_, IDC_C_DIRECCION);
         c.tipo = static_cast<int>(comboDato(h_, IDC_C_TIPO, CLIENTE_PRODUCTOR));
         c.activo = true;
+        // Cambiar los datos de un cliente ya registrado es un dato delicado.
+        if (c.id != 0 && !autorizar(h_, "modificar los datos de un cliente")) return;
         if (!intentar(h_, [&] { repo().guardarCliente(c); })) return;
         cargar();
         cargarEnFormulario(c.id);
@@ -152,6 +155,7 @@ private:
     void eliminar() {
         if (!editId_) return;
         if (!confirmar(h_, "¿Eliminar al cliente " + texto(h_, IDC_C_NOMBRE) + "?")) return;
+        if (!autorizar(h_, "eliminar un cliente")) return;
         ResultadoEliminar r = ResultadoEliminar::Eliminado;
         if (!intentar(h_, [&] { r = repo().eliminarCliente(editId_); })) return;
         if (r == ResultadoEliminar::Desactivado)

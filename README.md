@@ -13,8 +13,9 @@ deudas con clientes y productores, caja diaria y ventas. Usa una base de datos *
 
 | Pestaña | Para qué sirve |
 |---|---|
-| **Comprobante de compra** | Se escribe el DNI del productor (si ya existe, aparece su nombre; si no, se registra al guardar). Se agregan líneas de café pesado: tipo, peso en **libras o quintales**, **galones** (como dato) y precio por libra. El programa calcula los subtotales, el total, lo **pagado en efectivo** y el **saldo** que queda debiendo el beneficio, con una fecha de pago opcional. Al guardar, se imprime el comprobante en Excel. |
-| **Historial de compras** | Lista de comprobantes por fecha y productor, con totales. Permite reimprimir o **anular** un comprobante (devuelve el pago a la caja y anula el saldo pendiente). |
+| **Ingreso** | Al abrir, el programa pide **usuario y contraseña** (ver la sección 3). |
+| **Comprobante de compra** | Se escribe el DNI del productor (si ya existe, aparece su nombre; si no, se registra al guardar). Se agregan líneas de café pesado: tipo, peso en **libras o quintales**, **galones** (como dato) y precio por libra. El programa calcula los subtotales, el total, lo **pagado en efectivo** y el **saldo** que queda debiendo el beneficio, con una fecha de pago opcional. En el campo DNI también se puede escribir el **nombre** y presionar Enter para buscarlo. **Guardar e imprimir** manda el comprobante directo a la impresora; **Guardar** lo muestra dentro del programa. |
+| **Facturas** | Una **carpeta por cliente** con todos sus comprobantes. Doble clic para **verlo dentro del programa** (sin Excel), imprimirlo, abrir su PDF o **anular** (devuelve el pago a la caja y anula el saldo pendiente). |
 | **Clientes** | Productores y compradores: nombre, DNI/RTN, teléfono, dirección. Muestra cuánto les debe el beneficio y cuánto le deben. Genera el **estado de cuenta** en Excel. |
 | **Precio del día** | Precio por libra de cada tipo de café para cada fecha. Se puede escribir por libra o por quintal (el otro se calcula solo). Se pone solo en los comprobantes del día y se puede cambiar en un comprobante en particular. |
 | **Deudas** | Lo que **el beneficio debe** (saldos de comprobantes, dinero recibido) y lo que **le deben al beneficio** (préstamos, adelantos, saldos de ventas). Registra abonos, muestra vencidas en rojo y permite anular. |
@@ -26,6 +27,17 @@ deudas con clientes y productores, caja diaria y ventas. Usa una base de datos *
 **Recordatorio diario de deudas** de dos formas:
 1. **Al abrir el programa** (una vez al día) aparece una ventana con las deudas vencidas, las que vencen hoy y las que vencen pronto. También avisa si falta el precio del día o si quedó una caja sin cerrar.
 2. **Aviso de Windows** a la hora que usted elija, aunque el programa esté cerrado. Se activa en *Configuración → Activar aviso de Windows* y usa el Programador de tareas de Windows.
+
+**Pantalla:** el programa se abre a pantalla completa y elige solo el tamaño de letra para que las pestañas,
+los botones y las tablas aprovechen toda la pantalla.
+
+**Marca de agua** (*Configuración → Marca de agua*), en las tablas del programa, en el comprobante y en los
+reportes de Excel:
+- **Opción 1:** "UNIMAX" en diagonal con granos de café.
+- **Opción 2:** sello redondo con un grano de café.
+- **Sin marca de agua.**
+
+Cada comprobante se guarda también en PDF en `Documentos\BeneficioUnimax\Documentos\Facturas\<Cliente (DNI)>`.
 
 ---
 
@@ -45,7 +57,21 @@ Estas reglas salen de sus respuestas. Si alguna no es correcta, se puede cambiar
 
 ---
 
-## 3. Requisitos
+## 3. Usuarios y contraseñas
+
+- **Primer ingreso:** usuario **`admin`**, contraseña **`Unimax2026`**. En ese primer ingreso el programa pide
+  una **contraseña maestra nueva** y muestra un **código de recuperación**: anótelo y guárdelo fuera de la
+  computadora. Si olvida la contraseña, use *¿Olvidó su contraseña?* en la ventana de ingreso con ese código.
+- **Roles:** *Administrador* (todo) y *Operador* (registra compras, ventas, deudas y caja).
+- Estas acciones piden la contraseña de un administrador: anular comprobantes, ventas, deudas o abonos;
+  reabrir la caja; eliminar movimientos manuales; modificar o eliminar clientes; guardar la configuración;
+  administrar usuarios. Un administrador no la vuelve a escribir durante 5 minutos.
+- Menú *Sesión*: cambiar mi contraseña, usuarios y cerrar sesión. Cada operación guarda el usuario que la hizo.
+- Las contraseñas se guardan cifradas (PBKDF2-SHA256), no se pueden leer abriendo la base de datos.
+
+---
+
+## 4. Requisitos
 
 - Windows 10 u 11 de **64 bits**.
 - Microsoft Office de **64 bits** con **Excel** y **Access**. El programa usa el controlador de Access que viene con Office.
@@ -53,7 +79,7 @@ Estas reglas salen de sus respuestas. Si alguna no es correcta, se puede cambiar
 
 ---
 
-## 4. Compilar en Visual Studio
+## 5. Compilar en Visual Studio
 
 1. Descargue el proyecto: en GitHub, botón **Code → Download ZIP**, y descomprímalo. También puede clonarlo con Git.
 2. Abra Visual Studio y elija **Archivo → Abrir → Carpeta...** y seleccione la carpeta del proyecto (la que tiene `CMakeLists.txt`).
@@ -93,7 +119,7 @@ con el argumento `/noinstalar`.
 
 ---
 
-## 5. Dónde quedan sus datos
+## 6. Dónde quedan sus datos
 
 La primera vez que se abre, el programa crea esta carpeta:
 
@@ -115,7 +141,7 @@ Documentos\BeneficioUnimax\
 
 ---
 
-## 6. Rutina diaria recomendada
+## 7. Rutina diaria recomendada
 
 1. Abrir el programa y revisar el **recordatorio** del día.
 2. **Precio del día:** escribir el precio de cada tipo de café y guardar.
@@ -129,7 +155,7 @@ ese día). Si ya tiene recibos en papel, escriba también el número que sigue a
 
 ---
 
-## 7. Plantillas de Excel
+## 8. Plantillas de Excel
 
 Las plantillas están en `Documentos\BeneficioUnimax\Plantillas`. Puede abrirlas en Excel y cambiar colores,
 letras, columnas, agregar el logotipo, etc. Para que el programa siga sabiendo dónde escribir:
@@ -167,7 +193,7 @@ Para cambiarlo, edite `tools/generar_logo.py` y ejecute `python tools/generar_lo
 
 ---
 
-## 8. Problemas frecuentes
+## 9. Problemas frecuentes
 
 **"No se pudo crear/abrir la base de datos" o un mensaje sobre el controlador (driver).**
 El programa usa el controlador ODBC *Microsoft Access Driver (\*.mdb, \*.accdb)* de 64 bits. Para revisarlo:
@@ -175,6 +201,9 @@ abra *Orígenes de datos ODBC (64 bits)* desde el menú Inicio → pestaña *Con
 instale **Microsoft Access Database Engine 2016 Redistributable** (`accessdatabaseengine_X64.exe`) desde el
 sitio de Microsoft. Si el instalador se queja porque ya tiene Office, ejecútelo así:
 `accessdatabaseengine_X64.exe /quiet`.
+
+**No imprime o imprime en otra impresora.** En *Configuración → Impresión* elija la impresora y use
+*Imprimir página de prueba*. El PDF de cada comprobante necesita la impresora "Microsoft Print to PDF" de Windows.
 
 **Excel no se abre al imprimir.** Revise que Excel esté instalado y que no tenga un cuadro de diálogo abierto
 (por ejemplo, activación o recuperación de archivos). El archivo queda guardado de todos modos en
@@ -189,7 +218,7 @@ estar encendida y con la sesión iniciada a la hora del aviso.
 
 ---
 
-## 9. Para programadores
+## 10. Para programadores
 
 ```
 src/core/   Lógica del negocio sin Windows: fechas, dinero (en centavos), DNI, montos en letras,
@@ -197,7 +226,7 @@ src/core/   Lógica del negocio sin Windows: fechas, dinero (en centavos), DNI, 
 src/db/     ODBC (Access en Windows, SQLite en las pruebas), creación de tablas y Repositorio
             (todas las operaciones del negocio, con transacciones).
 src/win/    Interfaz Win32: ventana con pestañas, diálogos (app.rc), Excel por COM, avisos.
-tests/      Pruebas automáticas (189 comprobaciones).
+tests/      Pruebas automáticas (303 comprobaciones).
 plantillas/ Plantillas de Excel.
 tools/      Generadores del logo y de las plantillas, verificación de plantillas.
 logo/       Logo en SVG y PNG.

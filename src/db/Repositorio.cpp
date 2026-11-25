@@ -1,6 +1,7 @@
 #include "db/Repositorio.h"
 
 #include <algorithm>
+#include <cctype>
 
 #include "core/Identificacion.h"
 #include "core/Texto.h"
@@ -39,7 +40,7 @@ Deuda leerDeuda(const Sentencia& s) {
 const char* const SELECT_FACTURA =
     "SELECT f.Id, f.Numero, f.Fecha, f.HoraRegistro, f.ClienteId, c.Nombre, c.DNI, f.Total, f.Pagado, "
     "f.Saldo, f.Observaciones, f.Anulada, "
-    "(SELECT SUM(x.Libras) FROM FacturaDetalle AS x WHERE x.FacturaId = f.Id) "
+    "(SELECT SUM(x.Libras) FROM FacturaDetalle AS x WHERE x.FacturaId = f.Id), f.Usuario "
     "FROM Facturas AS f INNER JOIN Clientes AS c ON f.ClienteId = c.Id";
 
 Factura leerFactura(const Sentencia& s) {
@@ -57,6 +58,7 @@ Factura leerFactura(const Sentencia& s) {
     f.observaciones = s.texto(11);
     f.anulada = s.entero(12) != 0;
     f.totalLibras = s.decimal(13);
+    f.usuario = s.texto(14);
     return f;
 }
 
@@ -365,8 +367,8 @@ long Repositorio::registrarFactura(Factura& f) {
     f.anulada = false;
     f.observaciones = recortar(f.observaciones);
     c_.preparar(
-          "INSERT INTO Facturas (Numero, Fecha, HoraRegistro, ClienteId, Total, Pagado, Saldo, Observaciones, Anulada) "
-          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)")
+          "INSERT INTO Facturas (Numero, Fecha, HoraRegistro, ClienteId, Total, Pagado, Saldo, Observaciones, Anulada, "
+          "Usuario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)")
         .pEntero(f.numero)
         .pFecha(f.fecha)
         .pTexto(f.hora)
@@ -375,8 +377,10 @@ long Repositorio::registrarFactura(Factura& f) {
         .pDinero(f.pagado)
         .pDinero(f.saldo)
         .pTexto(f.observaciones)
+        .pTexto(usuario_)
         .ejecutar();
     f.id = ultimoId();
+    f.usuario = usuario_;
     for (const auto& l : f.lineas) {
         c_.preparar(
               "INSERT INTO FacturaDetalle (FacturaId, TipoCafeId, Libras, Galones, PrecioLibra, Subtotal) "
@@ -523,7 +527,7 @@ long Repositorio::registrarVenta(Venta& v) {
     v.observaciones = recortar(v.observaciones);
     c_.preparar(
           "INSERT INTO Ventas (Numero, Fecha, ClienteId, TipoCafeId, Libras, PrecioLibra, Total, Recibido, Saldo, "
-          "Observaciones, Anulada) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)")
+          "Observaciones, Anulada, Usuario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)")
         .pEntero(v.numero)
         .pFecha(v.fecha)
         .pEntero(v.clienteId)
@@ -534,6 +538,7 @@ long Repositorio::registrarVenta(Venta& v) {
         .pDinero(v.recibido)
         .pDinero(v.saldo)
         .pTexto(v.observaciones)
+        .pTexto(usuario_)
         .ejecutar();
     v.id = ultimoId();
     if (v.saldo > 0) {
@@ -596,7 +601,7 @@ void Repositorio::anularVenta(long id, const std::string& motivo, const Fecha& h
 long Repositorio::insertarDeuda(const Deuda& d) {
     auto s = c_.preparar(
         "INSERT INTO Deudas (ClienteId, Tipo, Origen, FacturaId, VentaId, Fecha, Vencimiento, Monto, Saldo, "
-        "Concepto, AfectoCaja, Anulada) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        "Concepto, AfectoCaja, Anulada, Usuario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     s.pEntero(d.clienteId).pEntero(static_cast<long>(d.tipo)).pTexto(d.origen);
     if (d.facturaId) s.pEntero(d.facturaId); else s.pNulo();
     if (d.ventaId) s.pEntero(d.ventaId); else s.pNulo();
@@ -607,6 +612,7 @@ long Repositorio::insertarDeuda(const Deuda& d) {
         .pTexto(d.concepto)
         .pEntero(d.afectoCaja ? 1 : 0)
         .pEntero(d.anulada ? 1 : 0)
+        .pTexto(usuario_)
         .ejecutar();
     return ultimoId();
 }
@@ -704,12 +710,14 @@ long Repositorio::registrarAbono(long deudaId, const Fecha& fecha, Centavos mont
     exigirCajaAbierta(fecha, "registrar el abono");
 
     db::Transaccion tx(c_);
-    c_.preparar("INSERT INTO Abonos (DeudaId, Fecha, HoraRegistro, Monto, Nota, Anulado) VALUES (?, ?, ?, ?, ?, 0)")
+    c_.preparar(
+          "INSERT INTO Abonos (DeudaId, Fecha, HoraRegistro, Monto, Nota, Anulado, Usuario) VALUES (?, ?, ?, ?, ?, 0, ?)")
         .pEntero(deudaId)
         .pFecha(fecha)
         .pTexto(horaActual())
         .pDinero(monto)
         .pTexto(recortar(nota))
+        .pTexto(usuario_)
         .ejecutar();
     const long abonoId = ultimoId();
     c_.preparar("UPDATE Deudas SET Saldo = ? WHERE Id = ?").pDinero(d->saldo - monto).pEntero(deudaId).ejecutar();
@@ -774,7 +782,7 @@ void Repositorio::anularDeuda(long deudaId, const Fecha& hoy) {
     if (d->facturaId)
         throw ErrorNegocio(
             "Esta deuda es el saldo de un comprobante de compra. Para quitarla, anule el comprobante en la pestaña "
-            "Historial.");
+            "Facturas.");
     if (d->ventaId)
         throw ErrorNegocio("Esta deuda es el saldo de una venta. Para quitarla, anule la venta en la pestaña Ventas.");
     if (abonosActivos(deudaId) > 0) throw ErrorNegocio("La deuda tiene abonos. Anule primero los abonos.");
@@ -837,8 +845,8 @@ std::map<long, ResumenDeudas> Repositorio::resumenDeudasPorCliente() {
 long Repositorio::insertarMovimiento(const Fecha& f, TipoMovimiento t, const std::string& origen,
                                      const std::string& concepto, const std::string& referencia, Centavos monto) {
     c_.preparar(
-          "INSERT INTO MovimientosCaja (Fecha, Hora, Tipo, Origen, Concepto, Referencia, Monto) "
-          "VALUES (?, ?, ?, ?, ?, ?, ?)")
+          "INSERT INTO MovimientosCaja (Fecha, Hora, Tipo, Origen, Concepto, Referencia, Monto, Usuario) "
+          "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .pFecha(f)
         .pTexto(horaActual())
         .pEntero(static_cast<long>(t))
@@ -846,6 +854,7 @@ long Repositorio::insertarMovimiento(const Fecha& f, TipoMovimiento t, const std
         .pTexto(concepto.empty() ? origen : concepto)
         .pTexto(referencia)
         .pDinero(monto)
+        .pTexto(usuario_)
         .ejecutar();
     return ultimoId();
 }
@@ -904,7 +913,7 @@ Centavos Repositorio::saldoInicial(const Fecha& f) {
 
 std::vector<MovimientoCaja> Repositorio::movimientos(const Fecha& f) {
     auto s = c_.preparar(
-        "SELECT Id, Fecha, Hora, Tipo, Origen, Concepto, Referencia, Monto FROM MovimientosCaja "
+        "SELECT Id, Fecha, Hora, Tipo, Origen, Concepto, Referencia, Monto, Usuario FROM MovimientosCaja "
         "WHERE Fecha = ? ORDER BY Hora, Id");
     s.pFecha(f).ejecutar();
     std::vector<MovimientoCaja> r;
@@ -918,6 +927,7 @@ std::vector<MovimientoCaja> Repositorio::movimientos(const Fecha& f) {
         m.concepto = s.texto(6);
         m.referencia = s.texto(7);
         m.monto = s.dinero(8);
+        m.usuario = s.texto(9);
         r.push_back(m);
     }
     return r;
@@ -960,7 +970,7 @@ void Repositorio::cerrarCaja(const Fecha& f, Centavos efectivoContado, const std
     const ResumenCaja r = resumenCaja(f);
     c_.preparar(
           "INSERT INTO CierresCaja (Fecha, Hora, SaldoInicial, Ingresos, Egresos, SaldoEsperado, EfectivoContado, "
-          "Diferencia, Notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          "Diferencia, Notas, Usuario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .pFecha(f)
         .pTexto(horaActual())
         .pDinero(r.saldoInicial)
@@ -970,6 +980,7 @@ void Repositorio::cerrarCaja(const Fecha& f, Centavos efectivoContado, const std
         .pDinero(efectivoContado)
         .pDinero(efectivoContado - r.esperado)
         .pTexto(recortar(notas))
+        .pTexto(usuario_)
         .ejecutar();
 }
 
@@ -1036,6 +1047,148 @@ Recordatorio Repositorio::recordatorio(const Fecha& hoy) {
     r.faltaPrecioHoy = preciosDelDia(hoy).vacio();
     r.diaSinCerrar = diaSinCerrar(hoy);
     return r;
+}
+
+// ================================================================ Usuarios
+namespace {
+const char* const SELECT_USUARIO = "SELECT Id, Usuario, Nombre, Rol, Activo, DebeCambiar, Hash FROM Usuarios";
+
+Usuario leerUsuario(const Sentencia& s) {
+    Usuario u;
+    u.id = s.entero(1);
+    u.usuario = s.texto(2);
+    u.nombre = s.texto(3);
+    u.rol = s.entero(4) == ROL_ADMINISTRADOR ? ROL_ADMINISTRADOR : ROL_OPERADOR;
+    u.activo = s.entero(5) != 0;
+    u.debeCambiar = s.entero(6) != 0;
+    return u;
+}
+
+std::string normalizarUsuario(const std::string& usuario) {
+    std::string r;
+    for (char ch : recortar(usuario)) r += static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    return r;
+}
+}  // namespace
+
+void Repositorio::asegurarUsuarioMaestro(const std::vector<uint8_t>& sal) {
+    auto s = c_.preparar("SELECT COUNT(*) FROM Usuarios");
+    s.ejecutar();
+    if (s.siguiente() && s.entero(1) > 0) return;
+    Usuario u;
+    u.usuario = USUARIO_MAESTRO;
+    u.nombre = "Administrador";
+    u.rol = ROL_ADMINISTRADOR;
+    u.activo = true;
+    u.debeCambiar = true;
+    c_.preparar(
+          "INSERT INTO Usuarios (Usuario, Nombre, Hash, Rol, Activo, DebeCambiar, FechaRegistro) "
+          "VALUES (?, ?, ?, ?, 1, 1, ?)")
+        .pTexto(u.usuario)
+        .pTexto(u.nombre)
+        .pTexto(crearHashContrasena(CONTRASENA_INICIAL, sal, iteraciones_))
+        .pEntero(u.rol)
+        .pFecha(Fecha::hoy())
+        .ejecutar();
+}
+
+std::vector<Usuario> Repositorio::usuarios() {
+    auto s = c_.preparar(std::string(SELECT_USUARIO) + " ORDER BY Usuario");
+    s.ejecutar();
+    std::vector<Usuario> r;
+    while (s.siguiente()) r.push_back(leerUsuario(s));
+    return r;
+}
+
+std::optional<Usuario> Repositorio::usuarioPorId(long id) {
+    auto s = c_.preparar(std::string(SELECT_USUARIO) + " WHERE Id = ?");
+    s.pEntero(id).ejecutar();
+    if (!s.siguiente()) return std::nullopt;
+    return leerUsuario(s);
+}
+
+std::optional<Usuario> Repositorio::autenticar(const std::string& usuario, const std::string& contrasena) {
+    auto s = c_.preparar(std::string(SELECT_USUARIO) + " WHERE Usuario = ?");
+    s.pTexto(normalizarUsuario(usuario)).ejecutar();
+    if (!s.siguiente()) {
+        // Se calcula igual un hash para que el tiempo de respuesta no revele si el usuario existe.
+        verificarContrasena(contrasena, crearHashContrasena("x", {1, 2, 3, 4}, iteraciones_));
+        return std::nullopt;
+    }
+    Usuario u = leerUsuario(s);
+    const std::string hash = s.texto(7);
+    if (!u.activo || !verificarContrasena(contrasena, hash)) return std::nullopt;
+    c_.preparar("UPDATE Usuarios SET UltimoIngreso = ? WHERE Id = ?").pFecha(Fecha::hoy()).pEntero(u.id).ejecutar();
+    return u;
+}
+
+long Repositorio::crearUsuario(Usuario& u, const std::string& contrasena, const std::vector<uint8_t>& sal) {
+    u.usuario = normalizarUsuario(u.usuario);
+    u.nombre = recortar(u.nombre);
+    if (u.usuario.size() < 3) throw ErrorNegocio("El usuario debe tener al menos 3 letras.");
+    for (char ch : u.usuario)
+        if (!std::isalnum(static_cast<unsigned char>(ch)) && ch != '.' && ch != '_' && ch != '-')
+            throw ErrorNegocio("El usuario solo puede tener letras sin tilde, números, punto, guion y guion bajo.");
+    const std::string error = validarContrasenaNueva(contrasena, u.usuario);
+    if (!error.empty()) throw ErrorNegocio(error);
+    auto dup = c_.preparar("SELECT COUNT(*) FROM Usuarios WHERE Usuario = ?");
+    dup.pTexto(u.usuario).ejecutar();
+    if (dup.siguiente() && dup.entero(1) > 0) throw ErrorNegocio("Ya existe el usuario \"" + u.usuario + "\".");
+    c_.preparar(
+          "INSERT INTO Usuarios (Usuario, Nombre, Hash, Rol, Activo, DebeCambiar, FechaRegistro) "
+          "VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .pTexto(u.usuario)
+        .pTexto(u.nombre)
+        .pTexto(crearHashContrasena(contrasena, sal, iteraciones_))
+        .pEntero(u.rol == ROL_ADMINISTRADOR ? ROL_ADMINISTRADOR : ROL_OPERADOR)
+        .pEntero(u.activo ? 1 : 0)
+        .pEntero(u.debeCambiar ? 1 : 0)
+        .pFecha(Fecha::hoy())
+        .ejecutar();
+    u.id = ultimoId();
+    return u.id;
+}
+
+int Repositorio::administradoresActivos(long excepto) {
+    auto s = c_.preparar("SELECT COUNT(*) FROM Usuarios WHERE Rol = ? AND Activo = 1 AND Id <> ?");
+    s.pEntero(ROL_ADMINISTRADOR).pEntero(excepto).ejecutar();
+    return s.siguiente() ? static_cast<int>(s.entero(1)) : 0;
+}
+
+void Repositorio::guardarUsuario(const Usuario& u) {
+    const auto actual = usuarioPorId(u.id);
+    if (!actual) throw ErrorNegocio("El usuario no existe.");
+    const bool quedaAdmin = u.activo && u.rol == ROL_ADMINISTRADOR;
+    if (actual->esAdministrador() && actual->activo && !quedaAdmin && administradoresActivos(u.id) == 0)
+        throw ErrorNegocio("Debe quedar al menos un administrador activo.");
+    c_.preparar("UPDATE Usuarios SET Nombre = ?, Rol = ?, Activo = ? WHERE Id = ?")
+        .pTexto(recortar(u.nombre))
+        .pEntero(u.rol == ROL_ADMINISTRADOR ? ROL_ADMINISTRADOR : ROL_OPERADOR)
+        .pEntero(u.activo ? 1 : 0)
+        .pEntero(u.id)
+        .ejecutar();
+}
+
+void Repositorio::cambiarContrasena(long id, const std::string& nueva, const std::vector<uint8_t>& sal,
+                                    bool debeCambiar) {
+    const auto u = usuarioPorId(id);
+    if (!u) throw ErrorNegocio("El usuario no existe.");
+    const std::string error = validarContrasenaNueva(nueva, u->usuario);
+    if (!error.empty()) throw ErrorNegocio(error);
+    c_.preparar("UPDATE Usuarios SET Hash = ?, DebeCambiar = ? WHERE Id = ?")
+        .pTexto(crearHashContrasena(nueva, sal, iteraciones_))
+        .pEntero(debeCambiar ? 1 : 0)
+        .pEntero(id)
+        .ejecutar();
+}
+
+void Repositorio::guardarCodigoRecuperacion(const std::string& codigo, const std::vector<uint8_t>& sal) {
+    setConfig("CodigoRecuperacion", crearHashContrasena(normalizarCodigo(codigo), sal, iteraciones_));
+}
+
+bool Repositorio::verificarCodigoRecuperacion(const std::string& codigo) {
+    const std::string guardado = config("CodigoRecuperacion");
+    return !guardado.empty() && verificarContrasena(normalizarCodigo(codigo), guardado);
 }
 
 }  // namespace bu

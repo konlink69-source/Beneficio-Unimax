@@ -10,6 +10,12 @@ LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_HONDURAS
 
 IDI_APP ICON "app.ico"
 IDB_LOGO BITMAP "logo_encabezado.bmp"
+IDB_LOGO_DOC BITMAP "logo_documento.bmp"
+IDB_MARCA1 BITMAP "marca1.bmp"
+IDB_MARCA2 BITMAP "marca2.bmp"
+// Marcas de agua para los documentos de Excel (PNG transparente)
+IDR_MARCA_PNG1 RCDATA "../../logo/marca-agua-1.png"
+IDR_MARCA_PNG2 RCDATA "../../logo/marca-agua-2.png"
 
 1 24 "app.manifest"
 
@@ -60,6 +66,13 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "&Salir", IDM_SALIR
     END
+    POPUP "&Sesión"
+    BEGIN
+        MENUITEM "Cambiar mi &contraseña...", IDM_CAMBIAR_CLAVE
+        MENUITEM "&Usuarios...", IDM_USUARIOS
+        MENUITEM SEPARATOR
+        MENUITEM "Cerrar &sesión", IDM_CERRAR_SESION
+    END
     POPUP "&Ver"
     BEGIN
         MENUITEM "&Recordatorio de deudas de hoy", IDM_RECORDATORIO
@@ -82,13 +95,13 @@ STYLE ESTILO_PAGINA
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
     GROUPBOX        "1. Cliente (productor que vende el café)", IDC_STATIC, 6, 2, 548, 46
-    LTEXT           "DNI:", IDC_STATIC, 14, 17, 18, 8
-    EDITTEXT        IDC_F_DNI, 34, 15, 84, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "Buscar...", IDC_F_BUSCAR, 122, 14, 46, 16
-    LTEXT           "Nombre:", IDC_STATIC, 176, 17, 30, 8
-    EDITTEXT        IDC_F_NOMBRE, 208, 15, 196, 14, ES_AUTOHSCROLL
-    LTEXT           "Teléfono:", IDC_STATIC, 412, 17, 34, 8
-    EDITTEXT        IDC_F_TELEFONO, 448, 15, 98, 14, ES_AUTOHSCROLL
+    LTEXT           "DNI:", IDC_F_LBL_DNI, 12, 16, 26, 12
+    EDITTEXT        IDC_F_DNI, 40, 14, 92, 15, ES_AUTOHSCROLL
+    PUSHBUTTON      "Buscar por nombre...", IDC_F_BUSCAR, 135, 13, 76, 17
+    LTEXT           "Nombre:", IDC_F_LBL_NOMBRE, 216, 16, 42, 12
+    EDITTEXT        IDC_F_NOMBRE, 260, 14, 150, 15, ES_AUTOHSCROLL
+    LTEXT           "Teléfono:", IDC_F_LBL_TEL, 414, 16, 50, 12
+    EDITTEXT        IDC_F_TELEFONO, 466, 14, 80, 15, ES_AUTOHSCROLL
     LTEXT           "", IDC_F_INFO, 14, 34, 532, 9
 
     LTEXT           "Comprobante No.:", IDC_STATIC, 8, 57, 62, 8
@@ -131,8 +144,8 @@ BEGIN
     PUSHBUTTON      "Nuevo (limpiar)", IDC_F_LIMPIAR, 476, 268, 78, 18
 END
 
-// =====================================================================  Historial de compras
-IDD_PAG_HISTORIAL DIALOGEX 0, 0, 560, 298
+// =====================================================================  Facturas por cliente
+IDD_PAG_FACTURAS DIALOGEX 0, 0, 560, 298
 STYLE ESTILO_PAGINA
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
@@ -142,15 +155,20 @@ BEGIN
     CONTROL         "", IDC_H_HASTA, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 130, 6, 66, 14
     PUSHBUTTON      "Hoy", IDC_H_HOY, 200, 5, 30, 16
     PUSHBUTTON      "Este mes", IDC_H_MES, 232, 5, 40, 16
-    LTEXT           "Productor (nombre o DNI):", IDC_STATIC, 280, 9, 90, 8
-    EDITTEXT        IDC_H_FILTRO, 372, 6, 120, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "Buscar", IDC_H_BUSCAR, 496, 5, 50, 16
-    PUSHBUTTON      "Ver / imprimir en Excel", IDC_H_IMPRIMIR, 6, 26, 96, 16
-    PUSHBUTTON      "Anular comprobante...", IDC_H_ANULAR, 106, 26, 90, 16
-    LTEXT           "", IDC_H_RESUMEN, 204, 26, 350, 18
-    CONTROL         "", IDC_H_LISTA, "SysListView32", LISTA, 6, 46, 548, 246
+    LTEXT           "Buscar cliente:", IDC_STATIC, 280, 9, 54, 8
+    EDITTEXT        IDC_H_FILTRO, 336, 6, 150, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Actualizar", IDC_H_BUSCAR, 490, 5, 56, 16
+    PUSHBUTTON      "Ver comprobante", IDC_H_VER, 6, 26, 72, 17
+    PUSHBUTTON      "Imprimir", IDC_H_IMPRIMIR, 82, 26, 50, 17
+    PUSHBUTTON      "Abrir PDF", IDC_H_EXCEL, 136, 26, 50, 17
+    PUSHBUTTON      "Abrir carpeta del cliente", IDC_H_CARPETA, 190, 26, 96, 17
+    PUSHBUTTON      "Anular comprobante...", IDC_H_ANULAR, 290, 26, 86, 17
+    LTEXT           "", IDC_H_RESUMEN, 6, 48, 548, 9
+    LTEXT           "Carpetas (una por cliente):", IDC_STATIC, 6, 60, 176, 8
+    LTEXT           "Comprobantes de la carpeta (doble clic para verlo):", IDC_STATIC, 188, 60, 300, 8
+    CONTROL         "", IDC_H_CLIENTES, "SysListView32", LISTA, 6, 70, 176, 222
+    CONTROL         "", IDC_H_LISTA, "SysListView32", LISTA, 188, 70, 366, 222
 END
-
 // =====================================================================  Clientes
 IDD_PAG_CLIENTES DIALOGEX 0, 0, 560, 298
 STYLE ESTILO_PAGINA
@@ -338,59 +356,72 @@ IDD_PAG_CONFIG DIALOGEX 0, 0, 560, 298
 STYLE ESTILO_PAGINA
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
-    GROUPBOX        "Datos de la empresa (encabezado de comprobantes y reportes)", IDC_STATIC, 6, 2, 548, 56
-    LTEXT           "Nombre:", IDC_STATIC, 14, 18, 40, 8
-    EDITTEXT        IDC_G_EMPRESA, 56, 16, 220, 14, ES_AUTOHSCROLL
-    LTEXT           "RTN:", IDC_STATIC, 284, 18, 20, 8
-    EDITTEXT        IDC_G_RTN, 306, 16, 100, 14, ES_AUTOHSCROLL
-    LTEXT           "Teléfono:", IDC_STATIC, 414, 18, 34, 8
-    EDITTEXT        IDC_G_TELEFONO, 450, 16, 96, 14, ES_AUTOHSCROLL
-    LTEXT           "Dirección:", IDC_STATIC, 14, 38, 40, 8
-    EDITTEXT        IDC_G_DIRECCION, 56, 36, 490, 14, ES_AUTOHSCROLL
+    GROUPBOX        "Datos de la empresa (comprobantes y reportes)", IDC_STATIC, 6, 2, 268, 76
+    LTEXT           "Nombre:", IDC_STATIC, 14, 17, 40, 8
+    EDITTEXT        IDC_G_EMPRESA, 58, 15, 208, 14, ES_AUTOHSCROLL
+    LTEXT           "RTN:", IDC_STATIC, 14, 35, 40, 8
+    EDITTEXT        IDC_G_RTN, 58, 33, 90, 14, ES_AUTOHSCROLL
+    LTEXT           "Teléfono:", IDC_STATIC, 154, 35, 34, 8
+    EDITTEXT        IDC_G_TELEFONO, 190, 33, 76, 14, ES_AUTOHSCROLL
+    LTEXT           "Dirección:", IDC_STATIC, 14, 53, 40, 8
+    EDITTEXT        IDC_G_DIRECCION, 58, 51, 208, 14, ES_AUTOHSCROLL
 
-    GROUPBOX        "Caja y numeración", IDC_STATIC, 6, 62, 548, 62
-    LTEXT           "Saldo inicial de la caja (L):", IDC_STATIC, 14, 78, 100, 8
-    EDITTEXT        IDC_G_APERTURA, 116, 76, 70, 14, NUM
-    LTEXT           "Dinero que había en caja el primer día de uso del programa (solo cuenta antes del primer cierre).", IDC_STATIC, 192, 78, 354, 9
-    LTEXT           "Primer No. de comprobante de compra:", IDC_STATIC, 14, 98, 134, 8
-    EDITTEXT        IDC_G_NUMFAC, 150, 96, 50, 14, ES_NUMBER | ES_AUTOHSCROLL
-    LTEXT           "Primer No. de venta:", IDC_STATIC, 214, 98, 74, 8
-    EDITTEXT        IDC_G_NUMVEN, 290, 96, 50, 14, ES_NUMBER | ES_AUTOHSCROLL
-    AUTOCHECKBOX    "Guardar también en PDF los documentos de Excel", IDC_G_PDF, 352, 97, 194, 10
-    LTEXT           "Si ya tiene recibos en papel, ponga el número que sigue al último.", IDC_STATIC, 14, 112, 300, 9
+    GROUPBOX        "Caja y numeración", IDC_STATIC, 6, 82, 268, 94
+    LTEXT           "Saldo inicial de la caja (L):", IDC_STATIC, 14, 97, 100, 8
+    EDITTEXT        IDC_G_APERTURA, 116, 95, 70, 14, NUM
+    LTEXT           "Dinero en caja el primer día de uso (solo cuenta antes del primer cierre).", IDC_STATIC, 14, 112, 252, 9
+    LTEXT           "Primer No. de comprobante:", IDC_STATIC, 14, 128, 100, 8
+    EDITTEXT        IDC_G_NUMFAC, 116, 126, 50, 14, ES_NUMBER | ES_AUTOHSCROLL
+    LTEXT           "Primer No. de venta:", IDC_STATIC, 14, 146, 100, 8
+    EDITTEXT        IDC_G_NUMVEN, 116, 144, 50, 14, ES_NUMBER | ES_AUTOHSCROLL
+    AUTOCHECKBOX    "Guardar en PDF los reportes de Excel", IDC_G_PDF, 14, 161, 250, 10
 
-    GROUPBOX        "Recordatorio diario de deudas", IDC_STATIC, 6, 128, 548, 82
-    LTEXT           "Avisar las deudas que vencen en los próximos", IDC_STATIC, 14, 144, 156, 8
-    EDITTEXT        IDC_G_DIAS, 172, 142, 26, 14, ES_NUMBER | ES_AUTOHSCROLL
-    LTEXT           "días.", IDC_STATIC, 202, 144, 30, 8
-    AUTOCHECKBOX    "Mostrar el recordatorio al abrir el programa (una vez al día)", IDC_G_ALABRIR, 240, 143, 300, 10
-    LTEXT           "Hora del aviso de Windows (HH:MM, 24 horas):", IDC_STATIC, 14, 164, 160, 8
-    EDITTEXT        IDC_G_HORA, 176, 162, 40, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "Activar aviso de Windows", IDC_G_ACTIVAR, 224, 161, 100, 16
-    PUSHBUTTON      "Desactivar", IDC_G_DESACTIVAR, 328, 161, 56, 16
-    PUSHBUTTON      "Probar aviso ahora", IDC_G_PROBAR, 388, 161, 76, 16
-    LTEXT           "", IDC_G_AVISO_ESTADO, 14, 184, 532, 20
+    GROUPBOX        "Archivos", IDC_STATIC, 6, 180, 268, 76
+    LTEXT           "", IDC_G_RUTA, 14, 192, 252, 36
+    PUSHBUTTON      "Respaldar base de datos...", IDC_G_RESPALDAR, 14, 233, 110, 16
+    PUSHBUTTON      "Abrir carpeta de datos", IDC_G_CARPETA, 128, 233, 96, 16
 
-    GROUPBOX        "Archivos", IDC_STATIC, 6, 214, 548, 56
-    LTEXT           "", IDC_G_RUTA, 14, 226, 532, 18
-    PUSHBUTTON      "Respaldar base de datos...", IDC_G_RESPALDAR, 14, 248, 100, 16
-    PUSHBUTTON      "Abrir carpeta de datos", IDC_G_CARPETA, 118, 248, 90, 16
-    PUSHBUTTON      "Guardar configuración", IDC_G_GUARDAR, 6, 276, 100, 18
+    GROUPBOX        "Recordatorio diario de deudas", IDC_STATIC, 280, 2, 274, 102
+    LTEXT           "Avisar las deudas que vencen en los próximos", IDC_STATIC, 288, 17, 160, 8
+    EDITTEXT        IDC_G_DIAS, 450, 15, 24, 14, ES_NUMBER | ES_AUTOHSCROLL
+    LTEXT           "días.", IDC_STATIC, 478, 17, 30, 8
+    AUTOCHECKBOX    "Mostrar el recordatorio al abrir el programa (una vez al día)", IDC_G_ALABRIR, 288, 33, 260, 10
+    LTEXT           "Hora del aviso de Windows (HH:MM):", IDC_STATIC, 288, 50, 130, 8
+    EDITTEXT        IDC_G_HORA, 420, 48, 40, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Activar aviso", IDC_G_ACTIVAR, 288, 66, 70, 16
+    PUSHBUTTON      "Desactivar", IDC_G_DESACTIVAR, 362, 66, 60, 16
+    PUSHBUTTON      "Probar aviso", IDC_G_PROBAR, 426, 66, 64, 16
+    LTEXT           "", IDC_G_AVISO_ESTADO, 288, 84, 258, 18
+
+    GROUPBOX        "Impresión y marca de agua", IDC_STATIC, 280, 108, 274, 92
+    LTEXT           "Impresora:", IDC_STATIC, 288, 123, 40, 8
+    COMBOBOX        IDC_G_IMPRESORA, 330, 121, 216, 120, COMBO
+    LTEXT           "Copias del comprobante:", IDC_STATIC, 288, 141, 90, 8
+    EDITTEXT        IDC_G_COPIAS, 380, 139, 24, 14, ES_NUMBER | ES_AUTOHSCROLL
+    PUSHBUTTON      "Imprimir página de prueba", IDC_G_PROBAR_IMP, 424, 138, 122, 16
+    AUTOCHECKBOX    "Guardar PDF de cada comprobante en la carpeta del cliente", IDC_G_PDF_COMP, 288, 158, 258, 10
+    LTEXT           "Marca de agua:", IDC_STATIC, 288, 176, 56, 8
+    COMBOBOX        IDC_G_MARCA, 346, 174, 200, 80, COMBO
+
+    GROUPBOX        "Seguridad", IDC_STATIC, 280, 204, 274, 52
+    LTEXT           "Se pide usuario y contraseña al abrir. Anular, reabrir la caja o cambiar datos delicados pide la contraseña de un administrador.", IDC_STATIC, 288, 215, 258, 18
+    PUSHBUTTON      "Usuarios...", IDC_G_USUARIOS, 288, 236, 70, 16
+    PUSHBUTTON      "Cambiar mi contraseña...", IDC_G_CLAVE, 362, 236, 100, 16
+
+    PUSHBUTTON      "Guardar configuración", IDC_G_GUARDAR, 6, 264, 110, 20
 END
-
 // =====================================================================  Diálogos modales
-IDD_SEL_CLIENTE DIALOGEX 0, 0, 360, 230
+IDD_SEL_CLIENTE DIALOGEX 0, 0, 520, 262
 STYLE ESTILO_MODAL
-CAPTION "Buscar cliente"
+CAPTION "Buscar cliente por nombre o DNI"
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
-    LTEXT           "Escriba parte del nombre o del DNI:", IDC_STATIC, 7, 9, 130, 8
-    EDITTEXT        IDC_S_BUSCAR, 140, 7, 213, 14, ES_AUTOHSCROLL
-    CONTROL         "", IDC_S_LISTA, "SysListView32", LISTA, 7, 26, 346, 176
-    DEFPUSHBUTTON   "Seleccionar", IDOK, 247, 208, 50, 16
-    PUSHBUTTON      "Cancelar", IDCANCEL, 303, 208, 50, 16
+    LTEXT           "Escriba parte del nombre, del apellido o del DNI:", IDC_STATIC, 7, 11, 170, 8
+    EDITTEXT        IDC_S_BUSCAR, 180, 7, 333, 16, ES_AUTOHSCROLL
+    CONTROL         "", IDC_S_LISTA, "SysListView32", LISTA, 7, 28, 506, 206
+    DEFPUSHBUTTON   "Seleccionar", IDOK, 393, 240, 60, 16
+    PUSHBUTTON      "Cancelar", IDCANCEL, 458, 240, 55, 16
 END
-
 IDD_NUEVA_DEUDA DIALOGEX 0, 0, 330, 236
 STYLE ESTILO_MODAL
 CAPTION "Nuevo préstamo o deuda"
@@ -490,4 +521,99 @@ BEGIN
     PUSHBUTTON      "Ir a Deudas", IDC_RC_IR, 7, 248, 60, 16
     PUSHBUTTON      "Imprimir deudas pendientes", IDC_RC_EXCEL, 71, 248, 100, 16
     DEFPUSHBUTTON   "Cerrar", IDCANCEL, 403, 248, 50, 16
+END
+
+// =====================================================================  Sesión y usuarios
+IDD_INGRESO DIALOGEX 0, 0, 300, 232
+STYLE ESTILO_MODAL
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Beneficio Unimax - Ingreso"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    CONTROL         "", IDC_L_LOGO, "Static", SS_BITMAP | SS_CENTERIMAGE, 20, 6, 260, 78
+    CTEXT           "Ingrese con su usuario y contraseña", IDC_L_TITULO, 10, 88, 280, 14
+    LTEXT           "Usuario:", IDC_STATIC, 26, 113, 64, 10
+    EDITTEXT        IDC_L_USUARIO, 92, 110, 176, 16, ES_AUTOHSCROLL
+    LTEXT           "Contraseña:", IDC_STATIC, 26, 135, 64, 10
+    EDITTEXT        IDC_L_CLAVE, 92, 132, 176, 16, ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "", IDC_L_INFO, 26, 153, 250, 9
+    LTEXT           "", IDC_L_AYUDA, 26, 164, 250, 18
+    DEFPUSHBUTTON   "Entrar", IDOK, 92, 186, 84, 18
+    PUSHBUTTON      "Salir", IDCANCEL, 184, 186, 84, 18
+    PUSHBUTTON      "¿Olvidó su contraseña?", IDC_L_OLVIDO, 92, 210, 176, 14
+END
+
+IDD_CAMBIAR_CLAVE DIALOGEX 0, 0, 300, 160
+STYLE ESTILO_MODAL
+CAPTION "Cambiar contraseña"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "", IDC_K2_INFO, 7, 7, 286, 36
+    LTEXT           "Contraseña actual:", IDC_K2_ACTUAL_LBL, 7, 51, 90, 8
+    EDITTEXT        IDC_K2_ACTUAL, 100, 48, 150, 14, ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Contraseña nueva:", IDC_STATIC, 7, 73, 90, 8
+    EDITTEXT        IDC_K2_NUEVA, 100, 70, 150, 14, ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Repetir la nueva:", IDC_STATIC, 7, 95, 90, 8
+    EDITTEXT        IDC_K2_REPETIR, 100, 92, 150, 14, ES_PASSWORD | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "Guardar", IDOK, 188, 136, 50, 16
+    PUSHBUTTON      "Cancelar", IDCANCEL, 243, 136, 50, 16
+END
+
+IDD_CODIGO DIALOGEX 0, 0, 320, 150
+STYLE ESTILO_MODAL
+CAPTION "Código de recuperación"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "Anote este código y guárdelo en un lugar seguro, fuera de la computadora. Si olvida la contraseña del administrador, con este código puede crear una nueva desde la ventana de ingreso.", IDC_STATIC, 7, 7, 306, 34
+    EDITTEXT        IDC_C2_CODIGO, 7, 46, 306, 30, ES_READONLY | ES_CENTER | ES_AUTOHSCROLL
+    LTEXT           "El código solo se muestra esta vez.", IDC_STATIC, 7, 84, 306, 9
+    DEFPUSHBUTTON   "Ya lo anoté", IDOK, 233, 126, 80, 16
+END
+
+IDD_AUTORIZAR DIALOGEX 0, 0, 280, 120
+STYLE ESTILO_MODAL
+CAPTION "Autorización de administrador"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "", IDC_A2_INFO, 7, 7, 266, 20
+    LTEXT           "Usuario:", IDC_STATIC, 7, 35, 60, 8
+    EDITTEXT        IDC_A2_USUARIO, 70, 32, 150, 14, ES_AUTOHSCROLL
+    LTEXT           "Contraseña:", IDC_STATIC, 7, 55, 60, 8
+    EDITTEXT        IDC_A2_CLAVE, 70, 52, 150, 14, ES_PASSWORD | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "Autorizar", IDOK, 168, 98, 50, 16
+    PUSHBUTTON      "Cancelar", IDCANCEL, 223, 98, 50, 16
+END
+
+IDD_USUARIOS DIALOGEX 0, 0, 380, 214
+STYLE ESTILO_MODAL
+CAPTION "Usuarios"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    CONTROL         "", IDC_U_LISTA, "SysListView32", LISTA, 7, 7, 366, 176
+    PUSHBUTTON      "Nuevo...", IDC_U_NUEVO, 7, 190, 50, 16
+    PUSHBUTTON      "Editar...", IDC_U_EDITAR, 61, 190, 50, 16
+    PUSHBUTTON      "Cambiar contraseña...", IDC_U_CLAVE, 115, 190, 86, 16
+    PUSHBUTTON      "Código de recuperación...", IDC_U_CODIGO, 205, 190, 104, 16
+    PUSHBUTTON      "Cerrar", IDCANCEL, 323, 190, 50, 16
+END
+
+IDD_USUARIO DIALOGEX 0, 0, 300, 190
+STYLE ESTILO_MODAL
+CAPTION "Nuevo usuario"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "Usuario (para ingresar):", IDC_STATIC, 7, 11, 100, 8
+    EDITTEXT        IDC_U2_USUARIO, 110, 8, 120, 14, ES_AUTOHSCROLL | ES_LOWERCASE
+    LTEXT           "Nombre completo:", IDC_STATIC, 7, 31, 100, 8
+    EDITTEXT        IDC_U2_NOMBRE, 110, 28, 183, 14, ES_AUTOHSCROLL
+    LTEXT           "Rol:", IDC_STATIC, 7, 51, 100, 8
+    COMBOBOX        IDC_U2_ROL, 110, 48, 183, 60, COMBO
+    LTEXT           "Contraseña:", IDC_U2_CLAVE_LBL, 7, 71, 100, 8
+    EDITTEXT        IDC_U2_CLAVE, 110, 68, 120, 14, ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Repetir contraseña:", IDC_U2_REPETIR_LBL, 7, 91, 100, 8
+    EDITTEXT        IDC_U2_REPETIR, 110, 88, 120, 14, ES_PASSWORD | ES_AUTOHSCROLL
+    AUTOCHECKBOX    "Usuario activo (puede ingresar)", IDC_U2_ACTIVO, 7, 112, 280, 10
+    AUTOCHECKBOX    "Pedir que cambie la contraseña al ingresar por primera vez", IDC_U2_CAMBIAR, 7, 126, 280, 10
+    DEFPUSHBUTTON   "Guardar", IDOK, 188, 166, 50, 16
+    PUSHBUTTON      "Cancelar", IDCANCEL, 243, 166, 50, 16
 END

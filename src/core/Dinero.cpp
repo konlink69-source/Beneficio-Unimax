@@ -46,7 +46,8 @@ std::string formatoLempiras(Centavos c) {
 
 std::string formatoDecimal(double valor, int decimales) {
     char buf[64];
-    std::snprintf(buf, sizeof buf, "%.*f", decimales, std::fabs(valor));
+    // El pequeño ajuste evita que 1.255 (guardado como 1.25499...) se redondee hacia abajo.
+    std::snprintf(buf, sizeof buf, "%.*f", decimales, std::fabs(valor) * (1 + 1e-12) + 1e-9);
     std::string s(buf);
     const auto punto = s.find('.');
     std::string entero = punto == std::string::npos ? s : s.substr(0, punto);

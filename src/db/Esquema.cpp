@@ -88,6 +88,11 @@ const std::vector<Tabla>& tablas() {
          "Tipo LONG NOT NULL, Origen TEXT(20) NOT NULL, Concepto TEXT(255) NOT NULL, "
          "Referencia TEXT(50), Monto CURRENCY NOT NULL)",
          {"CREATE INDEX IX_Movimientos_Fecha ON MovimientosCaja (Fecha)"}},
+        {"Usuarios",
+         "CREATE TABLE Usuarios (Id %PK%, Usuario TEXT(50) NOT NULL, Nombre TEXT(150), Hash TEXT(200) NOT NULL, "
+         "Rol LONG NOT NULL, Activo LONG NOT NULL, DebeCambiar LONG NOT NULL, FechaRegistro DATETIME, "
+         "UltimoIngreso DATETIME, CONSTRAINT UQ_Usuarios_Usuario UNIQUE (Usuario))",
+         {}},
         {"CierresCaja",
          "CREATE TABLE CierresCaja (Fecha DATETIME NOT NULL PRIMARY KEY, Hora TEXT(8), "
          "SaldoInicial CURRENCY NOT NULL, Ingresos CURRENCY NOT NULL, Egresos CURRENCY NOT NULL, "
@@ -115,6 +120,12 @@ void crearEsquema(Conexion& c, Dialecto d) {
         for (const char* idx : t.indices) c.ejecutar(idx);
     }
 
+    // Versión 2: columna "Usuario" (quién registró cada operación). Se agrega si falta,
+    // así funciona igual con bases de datos nuevas y con las creadas por versiones anteriores.
+    for (const char* tabla : {"Facturas", "Ventas", "Deudas", "Abonos", "MovimientosCaja", "CierresCaja"})
+        if (!c.existeColumna(tabla, "Usuario"))
+            c.ejecutar(std::string("ALTER TABLE ") + tabla + " ADD COLUMN Usuario TEXT(50)");
+
     // Tipos de café fijos.
     const std::pair<int, const char*> tipos[] = {{1, "Uva"}, {2, "Pergamino húmedo"}, {3, "Pergamino seco"}};
     for (const auto& tp : tipos) {
@@ -126,6 +137,10 @@ void crearEsquema(Conexion& c, Dialecto d) {
 
     // Configuración inicial.
     insertarConfigSiFalta(c, "VersionEsquema", std::to_string(VERSION_ESQUEMA));
+    c.preparar("UPDATE Configuracion SET Valor = ? WHERE Clave = ?")
+        .pTexto(std::to_string(VERSION_ESQUEMA))
+        .pTexto("VersionEsquema")
+        .ejecutar();
     insertarConfigSiFalta(c, "EmpresaNombre", "Beneficio Unimax");
     insertarConfigSiFalta(c, "EmpresaRTN", "");
     insertarConfigSiFalta(c, "EmpresaDireccion", "");
@@ -138,6 +153,11 @@ void crearEsquema(Conexion& c, Dialecto d) {
     insertarConfigSiFalta(c, "HoraAviso", "07:30");
     insertarConfigSiFalta(c, "GuardarPdf", "0");
     insertarConfigSiFalta(c, "UltimoRecordatorio", "");
+    insertarConfigSiFalta(c, "MarcaAgua", "1");
+    insertarConfigSiFalta(c, "Impresora", "");
+    insertarConfigSiFalta(c, "CopiasComprobante", "1");
+    insertarConfigSiFalta(c, "GuardarPdfComprobante", "1");
+    insertarConfigSiFalta(c, "CodigoRecuperacion", "");
 }
 
 std::string cadenaConexionAccess(const std::string& rutaArchivo) {

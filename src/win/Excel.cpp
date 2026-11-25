@@ -4,6 +4,7 @@
 
 #include <cstdio>
 
+#include <algorithm>
 #include <stdexcept>
 #include <vector>
 
@@ -28,6 +29,24 @@ VARIANT vEntero(long n) {
     v.vt = VT_I4;
     v.lVal = n;
     return v;
+}
+
+VARIANT vNumero(double d) {
+    VARIANT v;
+    VariantInit(&v);
+    v.vt = VT_R8;
+    v.dblVal = d;
+    return v;
+}
+
+double aNumero(VARIANT v) {
+    VARIANT r;
+    VariantInit(&r);
+    double n = 0;
+    if (SUCCEEDED(VariantChangeType(&r, &v, 0, VT_R8))) n = r.dblVal;
+    VariantClear(&r);
+    VariantClear(&v);
+    return n;
 }
 
 VARIANT vBool(bool b) {
@@ -257,6 +276,24 @@ std::wstring generarDocumento(const Documento& doc, bool tambienPdf, bool mostra
                     .poner(L"NumberFormat", vTexto(W(tabla.formatos[c])));
             destinoTabla.poner(L"Value", arregloTabla(tabla.filas, columnas));
             destinoTabla.obtener(L"Borders").poner(L"LineStyle", vEntero(1));  // xlContinuous
+        }
+        // Marca de agua (imagen PNG casi transparente) centrada sobre el contenido de la primera hoja.
+        const int marca = app.marcaAgua();
+        const std::wstring png = app.rutaMarcaAguaPng(marca);
+        if (marca != MARCA_NINGUNA && existeArchivo(png)) {
+            try {
+                Disp hoja = libro.obtener(L"Worksheets").obtener(L"Item", {vEntero(1)});
+                Disp usado = hoja.obtener(L"UsedRange");
+                const double izq = aNumero(usado.valor(L"Left")), arriba = aNumero(usado.valor(L"Top"));
+                const double ancho = aNumero(usado.valor(L"Width")), alto = aNumero(usado.valor(L"Height"));
+                double lado = std::min({ancho, alto, 430.0}) * 0.9;
+                if (lado < 120) lado = std::min(ancho, 300.0);
+                hoja.obtener(L"Shapes").obtener(
+                    L"AddPicture", {vTexto(png), vEntero(0), vEntero(-1), vNumero(izq + (ancho - lado) / 2),
+                                    vNumero(arriba + std::max(0.0, (alto - lado) / 2)), vNumero(lado), vNumero(lado)});
+            } catch (...) {
+                // La marca de agua es opcional: si Excel no la acepta, el documento sale igual.
+            }
         }
         libro.llamar(L"Save");
         if (tambienPdf) {

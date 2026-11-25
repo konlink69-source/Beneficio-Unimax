@@ -16,6 +16,7 @@
 #include "win/Avisos.h"
 #include "win/Instalacion.h"
 #include "win/Paginas.h"
+#include "win/Sesion.h"
 #include "win/resource.h"
 
 using namespace bu;
@@ -45,7 +46,50 @@ int escala(int valor) {
     return MulDiv(valor, ppp, 96);
 }
 
-int altoEncabezado() { return escala(64); }
+int altoEncabezado() { return escala(104); }
+
+// ------------------------------------------------ Tamaño de letra según la pantalla
+// Todas las pestañas tienen el mismo tamaño de diseño. Se elige la letra más grande con la
+// que la pestaña cabe en la pantalla: así las ventanas, los botones y las tablas llenan el espacio.
+INT_PTR CALLBACK procMedir(HWND, UINT msg, WPARAM, LPARAM) { return msg == WM_INITDIALOG; }
+
+SIZE medirPagina(HWND padre, int puntos) {
+    const std::vector<BYTE> t = plantillaDialogo(IDD_PAG_FACTURA, puntos);
+    SIZE r{0, 0};
+    if (t.empty()) return r;
+    HWND d = CreateDialogIndirectParamW(App::instancia().hInst, reinterpret_cast<LPCDLGTEMPLATEW>(t.data()), padre,
+                                        procMedir, 0);
+    if (!d) return r;
+    RECT rc;
+    GetWindowRect(d, &rc);
+    DestroyWindow(d);
+    r.cx = rc.right - rc.left;
+    r.cy = rc.bottom - rc.top;
+    return r;
+}
+
+void elegirTamanoLetra() {
+    RECT trabajo;
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &trabajo, 0);
+    const int bordeX = GetSystemMetrics(SM_CXSIZEFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
+    const int bordeY = GetSystemMetrics(SM_CYSIZEFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
+    HWND temporal = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 10, 10, nullptr, nullptr,
+                                    App::instancia().hInst, nullptr);
+    int elegido = 8;
+    for (int puntos = 14; puntos >= 8; --puntos) {
+        const int altoPestanas = escala(static_cast<int>((puntos + 2) * 96 / 72.0 * 1.35) + 24);
+        const int disponibleW = (trabajo.right - trabajo.left) - 2 * bordeX - escala(24);
+        const int disponibleH = (trabajo.bottom - trabajo.top) - GetSystemMetrics(SM_CYCAPTION) -
+                                GetSystemMetrics(SM_CYMENU) - 2 * bordeY - altoEncabezado() - altoPestanas - escala(16);
+        const SIZE t = medirPagina(temporal, puntos);
+        if (t.cx > 0 && t.cx <= disponibleW && t.cy <= disponibleH) {
+            elegido = puntos;
+            break;
+        }
+    }
+    DestroyWindow(temporal);
+    establecerTamanoLetra(elegido);
+}
 
 std::string fechaLarga(const Fecha& f) {
     static const char* const DIAS[] = {"domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"};
@@ -70,27 +114,30 @@ void pintarEncabezado(HWND h, HDC dc) {
 
     int x = escala(10);
     if (g.logo && g.logoAlto > 0) {
-        const int la = alto - viga - escala(8);
+        const int la = alto - viga - escala(10);
         const int an = MulDiv(g.logoAncho, la, g.logoAlto);
         HDC mem = CreateCompatibleDC(dc);
         HGDIOBJ anterior = SelectObject(mem, g.logo);
         SetStretchBltMode(dc, HALFTONE);
         SetBrushOrgEx(dc, 0, 0, nullptr);
-        StretchBlt(dc, x, escala(4), an, la, mem, 0, 0, g.logoAncho, g.logoAlto, SRCCOPY);
+        StretchBlt(dc, x, escala(5), an, la, mem, 0, 0, g.logoAncho, g.logoAlto, SRCCOPY);
         SelectObject(mem, anterior);
         DeleteDC(mem);
         x += an;
     }
     SetBkMode(dc, TRANSPARENT);
-    const int medio = (alto - viga) / 2 + escala(3);
-    RECT rt{x + escala(16), escala(4), r.right - escala(16), medio};
-    HGDIOBJ fuenteAnterior = SelectObject(dc, fuenteGrande());
+    const int medio = (alto - viga) / 2 + escala(4);
+    RECT rt{x + escala(16), escala(6), r.right - escala(18), medio};
+    HGDIOBJ fuenteAnterior = SelectObject(dc, fuente(tamanoLetra() * 1.9, true));
     SetTextColor(dc, COLOR_CAFE);
     DrawTextW(dc, L"Contabilidad de compra de café", -1, &rt, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE | DT_END_ELLIPSIS);
-    RECT rf{rt.left, medio, rt.right, alto - viga};
-    SelectObject(dc, fuenteNormal());
+    RECT rf{rt.left, medio + escala(2), rt.right, alto - viga};
+    SelectObject(dc, fuente(tamanoLetra() * 1.15, false));
     SetTextColor(dc, COLOR_GRIS);
-    DrawTextW(dc, W("Hoy es " + fechaLarga(Fecha::hoy())).c_str(), -1, &rf, DT_RIGHT | DT_TOP | DT_SINGLELINE);
+    std::string linea = "Hoy es " + fechaLarga(Fecha::hoy());
+    const Usuario& u = App::instancia().usuario();
+    if (u.id) linea = "Usuario: " + (u.nombre.empty() ? u.usuario : u.nombre) + " (" + nombreRol(u.rol) + ")    ·    " + linea;
+    DrawTextW(dc, W(linea).c_str(), -1, &rf, DT_RIGHT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS);
     SelectObject(dc, fuenteAnterior);
 }
 
@@ -128,9 +175,11 @@ bool crearContenido(HWND h) {
     g.pestanas = CreateWindowExW(0, WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_TABSTOP, 0, 0, 100,
                                  100, h, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_PESTANAS)),
                                  App::instancia().hInst, nullptr);
-    SendMessageW(g.pestanas, WM_SETFONT, reinterpret_cast<WPARAM>(fuenteNegrita()), TRUE);
+    // Pestañas grandes: letra más grande y más relleno alrededor del texto.
+    SendMessageW(g.pestanas, WM_SETFONT, reinterpret_cast<WPARAM>(fuente(tamanoLetra() + 2, true)), TRUE);
+    SendMessageW(g.pestanas, TCM_SETPADDING, 0, MAKELPARAM(escala(18), escala(9)));
     const std::pair<int, std::unique_ptr<Pagina> (*)()> definiciones[NUM_PAGINAS] = {
-        {IDD_PAG_FACTURA, crearPaginaFactura},     {IDD_PAG_HISTORIAL, crearPaginaHistorial},
+        {IDD_PAG_FACTURA, crearPaginaFactura},     {IDD_PAG_FACTURAS, crearPaginaFacturas},
         {IDD_PAG_CLIENTES, crearPaginaClientes},   {IDD_PAG_PRECIOS, crearPaginaPrecios},
         {IDD_PAG_DEUDAS, crearPaginaDeudas},       {IDD_PAG_CAJA, crearPaginaCaja},
         {IDD_PAG_VENTAS, crearPaginaVentas},       {IDD_PAG_REPORTES, crearPaginaReportes},
@@ -236,6 +285,22 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case IDM_INSTALAR:
                     instalarDesdeMenu(h);
                     return 0;
+                case IDM_CAMBIAR_CLAVE:
+                    dialogoCambiarMiContrasena(h);
+                    return 0;
+                case IDM_USUARIOS:
+                    dialogoUsuarios(h);
+                    return 0;
+                case IDM_CERRAR_SESION:
+                    ShowWindow(h, SW_HIDE);
+                    if (!iniciarSesion(nullptr)) {
+                        DestroyWindow(h);
+                        return 0;
+                    }
+                    ShowWindow(h, SW_SHOWMAXIMIZED);
+                    InvalidateRect(h, nullptr, TRUE);
+                    if (g.actual >= 0) mostrarPagina(g.actual);
+                    return 0;
                 case IDM_RECORDATORIO:
                     App::instancia().mostrarRecordatorio(h, true);
                     return 0;
@@ -260,6 +325,11 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_APP_IR_PAGINA:
             mostrarPagina(static_cast<int>(wp));
             return 0;
+        case WM_APP_MARCA_AGUA: {
+            const int marca = App::instancia().marcaAgua();
+            for (auto& p : g.paginas) p->aplicarMarcaAgua(marca);
+            return 0;
+        }
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
@@ -351,6 +421,14 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
         const int r = ejecutarModoAviso(hInst, probar);
         CoUninitialize();
         return r;
+    }
+
+    // Tamaño de letra según la pantalla (también lo usan las ventanas de ingreso).
+    elegirTamanoLetra();
+    // Usuario y contraseña antes de mostrar cualquier dato.
+    if (!iniciarSesion(nullptr)) {
+        CoUninitialize();
+        return 0;
     }
 
     WNDCLASSEXW wc{};

@@ -45,6 +45,7 @@ public:
     void ejecutar(const std::string& sql);
     Sentencia preparar(const std::string& sql);
     bool existeTabla(const std::string& nombre);
+    bool existeColumna(const std::string& tabla, const std::string& columna);
 
     void iniciarTransaccion();
     void confirmar();

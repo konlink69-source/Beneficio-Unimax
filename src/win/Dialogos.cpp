@@ -4,14 +4,17 @@
 #include "core/Texto.h"
 #include "win/App.h"
 #include "win/Excel.h"
+#include "win/Sesion.h"
 #include "win/resource.h"
 
 namespace bu::win {
 
 // ================================================================ DialogoModal
 INT_PTR DialogoModal::mostrar(HWND padre, int plantilla) {
-    return DialogBoxParamW(App::instancia().hInst, MAKEINTRESOURCEW(plantilla), padre, proc,
-                           reinterpret_cast<LPARAM>(this));
+    const std::vector<BYTE> t = plantillaDialogo(plantilla, tamanoLetra());
+    if (t.empty()) return IDCANCEL;
+    return DialogBoxIndirectParamW(App::instancia().hInst, reinterpret_cast<LPCDLGTEMPLATEW>(t.data()), padre, proc,
+                                   reinterpret_cast<LPARAM>(this));
 }
 
 INT_PTR CALLBACK DialogoModal::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
@@ -49,6 +52,10 @@ INT_PTR CALLBACK DialogoModal::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             }
             return FALSE;
         }
+        case WM_CTLCOLORDLG:
+        case WM_CTLCOLORSTATIC:
+        case WM_CTLCOLORBTN:
+            return self ? self->alColor(msg, reinterpret_cast<HDC>(wp), reinterpret_cast<HWND>(lp)) : FALSE;
         default:
             return FALSE;
     }
@@ -112,7 +119,10 @@ bool EntradaCliente::comando(int id, int codigo) {
             soloLectura(dlg_, idNombre_, false);
             info("");
         } else if (codigo == EN_KILLFOCUS) {
-            buscar();
+            if (tieneLetras(texto(dlg_, idDni_)))
+                info("Presione Enter para buscar el cliente por nombre.");
+            else
+                buscar();
         }
         return true;
     }
@@ -146,8 +156,43 @@ void EntradaCliente::buscar() {
     });
 }
 
-void EntradaCliente::elegir() {
-    if (auto c = seleccionarCliente(dlg_)) poner(*c);
+void EntradaCliente::elegir(const std::string& filtro) {
+    if (auto c = seleccionarCliente(dlg_, filtro)) poner(*c);
+}
+
+bool EntradaCliente::alPresionarEnter() {
+    HWND foco = GetFocus();
+    if (foco == GetDlgItem(dlg_, idDni_)) {
+        const std::string t = recortar(texto(dlg_, idDni_));
+        if (tieneLetras(t)) {
+            // Se escribió un nombre en el campo DNI: se busca por nombre.
+            elegir(t);
+            if (!cliente_) {
+                poniendo_ = true;
+                ponerTexto(dlg_, idDni_, "");
+                poniendo_ = false;
+                if (vacio(dlg_, idNombre_)) ponerTexto(dlg_, idNombre_, t);
+                info("No se eligió un cliente registrado. Escriba el DNI del cliente nuevo.", true);
+                enfocar(dlg_, idDni_);
+            }
+        } else {
+            buscar();
+        }
+        return true;
+    }
+    if (foco == GetDlgItem(dlg_, idNombre_) && !cliente_) {
+        const std::string nombre = recortar(texto(dlg_, idNombre_));
+        if (nombre.size() < 3) return false;
+        bool hayParecidos = false;
+        intentar(dlg_, [&] {
+            for (const auto& c : repo().clientes())
+                if (coincideBusqueda(c.nombre, nombre)) hayParecidos = true;
+        });
+        if (!hayParecidos) return false;
+        elegir(nombre);
+        return cliente_.has_value();
+    }
+    return false;
 }
 
 void EntradaCliente::poner(const Cliente& c) {
@@ -195,15 +240,21 @@ namespace {
 
 class DlgSeleccionarCliente : public DialogoModal {
 public:
+    explicit DlgSeleccionarCliente(std::string filtro) : filtroInicial_(std::move(filtro)) {}
     std::optional<Cliente> elegido;
 
 protected:
     void alIniciar() override {
         lvConfigurar(h_, IDC_S_LISTA,
-                     {{L"Nombre", 150}, {L"DNI / RTN", 80}, {L"Teléfono", 60}, {L"Tipo", 70}});
+                     {{L"Nombre", 160}, {L"DNI / RTN", 80}, {L"Teléfono", 64}, {L"Dirección", 110}, {L"Tipo", 66}});
+        ponerFuente(h_, IDC_S_BUSCAR, fuente(tamanoLetra() * 11.0 / 9.0, false));
+        textoGuia(h_, IDC_S_BUSCAR, L"Nombre, apellido o DNI");
         intentar(h_, [&] { todos_ = repo().clientes(); });
+        ponerTexto(h_, IDC_S_BUSCAR, filtroInicial_);
         filtrar();
         enfocar(h_, IDC_S_BUSCAR);
+        SendDlgItemMessageW(h_, IDC_S_BUSCAR, EM_SETSEL, static_cast<WPARAM>(filtroInicial_.size()),
+                            static_cast<LPARAM>(filtroInicial_.size()));
     }
     bool alComando(int id, int codigo) override {
         if (id == IDC_S_BUSCAR && codigo == EN_CHANGE) {
@@ -237,10 +288,11 @@ private:
         const std::string f = texto(h_, IDC_S_BUSCAR);
         for (const auto& c : todos_)
             if (coincideBusqueda(c.nombre + " " + c.dni + " " + c.telefono, f))
-                lvAgregar(h_, IDC_S_LISTA, {c.nombre, c.dni, c.telefono, nombreTipoCliente(c.tipo)}, c.id);
+                lvAgregar(h_, IDC_S_LISTA, {c.nombre, c.dni, c.telefono, c.direccion, nombreTipoCliente(c.tipo)}, c.id);
         if (ListView_GetItemCount(GetDlgItem(h_, IDC_S_LISTA)) > 0) lvSeleccionar(h_, IDC_S_LISTA, 0);
     }
     std::vector<Cliente> todos_;
+    std::string filtroInicial_;
 };
 
 // ================================================================ Nueva deuda / préstamo
@@ -283,10 +335,7 @@ protected:
         }
     }
     bool alAceptar() override {
-        if (cliente_.tieneFoco()) {
-            cliente_.buscar();
-            return false;
-        }
+        if (cliente_.alPresionarEnter()) return false;
         bool cancelado = false;
         const bool ok = intentar(h_, [&] {
             const auto monto = leerMonto(h_, IDC_N_MONTO);
@@ -401,7 +450,8 @@ protected:
                 return true;
             }
             if (confirmar(h_, "¿Anular el abono seleccionado? El saldo de la deuda aumentará y se registrará el "
-                              "movimiento contrario en la caja de hoy."))
+                              "movimiento contrario en la caja de hoy.") &&
+                autorizar(h_, "anular un abono"))
                 if (intentar(h_, [&] { repo().anularAbono(abonoId, Fecha::hoy()); })) cargar();
             return true;
         }
@@ -556,8 +606,8 @@ private:
 }  // namespace
 
 // ================================================================ Funciones públicas
-std::optional<Cliente> seleccionarCliente(HWND padre) {
-    DlgSeleccionarCliente d;
+std::optional<Cliente> seleccionarCliente(HWND padre, const std::string& filtroInicial) {
+    DlgSeleccionarCliente d(filtroInicial);
     if (d.mostrar(padre, IDD_SEL_CLIENTE) == IDOK) return d.elegido;
     return std::nullopt;
 }

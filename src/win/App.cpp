@@ -97,6 +97,7 @@ void extraerPlantillasIncluidas(const std::wstring& destino) {
         {IDR_PLT_ESTADO_CUENTA, L"EstadoCuenta.xlsx"}, {IDR_PLT_DEUDAS, L"ReporteDeudas.xlsx"},
         {IDR_PLT_COMPRAS, L"ReporteCompras.xlsx"},  {IDR_PLT_VENTAS, L"ReporteVentas.xlsx"},
         {IDR_PLT_CAJA, L"ReporteCaja.xlsx"},
+        {IDR_MARCA_PNG1, L"marca_agua_1.png"},    {IDR_MARCA_PNG2, L"marca_agua_2.png"},
     };
     HMODULE modulo = GetModuleHandleW(nullptr);
     for (const auto& p : plantillas) {
@@ -161,6 +162,56 @@ void App::abrirBaseDatos() {
     conexion_.abrir(db::cadenaConexionAccess(U(rutas_.baseDatos)));
     db::crearEsquema(conexion_, db::Dialecto::Access);
     repo_ = std::make_unique<Repositorio>(conexion_, db::Dialecto::Access);
+    repo_->asegurarUsuarioMaestro(bytesAleatorios(16));
+    if (usuario_.id) repo_->usarUsuario(usuario_.usuario);
+}
+
+void App::establecerUsuario(const Usuario& u) {
+    usuario_ = u;
+    if (repo_) repo_->usarUsuario(u.usuario);
+}
+
+int App::marcaAgua() {
+    try {
+        const long m = repo().configEntero("MarcaAgua", MARCA_DIAGONAL);
+        return (m == MARCA_DIAGONAL || m == MARCA_SELLO) ? static_cast<int>(m) : MARCA_NINGUNA;
+    } catch (...) {
+        return MARCA_NINGUNA;
+    }
+}
+
+HBITMAP App::marcaAguaParaLista(int marca) {
+    const ImagenDib img = imagenRecurso(marca == MARCA_SELLO ? IDB_MARCA2 : IDB_MARCA1);
+    if (!img.info) return nullptr;
+    HDC pantalla = GetDC(nullptr);
+    const int lado = MulDiv(230, GetDeviceCaps(pantalla, LOGPIXELSY), 96);
+    BITMAPINFO bi{};
+    bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
+    bi.bmiHeader.biWidth = lado;
+    bi.bmiHeader.biHeight = lado;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 24;
+    void* bits = nullptr;
+    HBITMAP bmp = CreateDIBSection(pantalla, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    HDC mem = CreateCompatibleDC(pantalla);
+    HGDIOBJ anterior = SelectObject(mem, bmp);
+    RECT r{0, 0, lado, lado};
+    FillRect(mem, &r, static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+    SetStretchBltMode(mem, HALFTONE);
+    SetBrushOrgEx(mem, 0, 0, nullptr);
+    StretchDIBits(mem, 0, 0, lado, lado, 0, 0, img.ancho, img.alto, img.bits, img.info, DIB_RGB_COLORS, SRCCOPY);
+    SelectObject(mem, anterior);
+    DeleteDC(mem);
+    ReleaseDC(nullptr, pantalla);
+    return bmp;
+}
+
+std::wstring App::rutaMarcaAguaPng(int marca) const {
+    return rutas_.plantillas + (marca == MARCA_SELLO ? L"\\marca_agua_2.png" : L"\\marca_agua_1.png");
+}
+
+void App::refrescarMarcaAgua() {
+    if (ventana) PostMessageW(ventana, WM_APP_MARCA_AGUA, 0, 0);
 }
 
 std::wstring App::rutaPlantilla(const std::string& archivo) const {

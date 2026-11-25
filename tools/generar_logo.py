@@ -9,6 +9,8 @@ Archivos que genera:
   logo/icono-unimax.svg/.png  ícono cuadrado
   src/win/app.ico             ícono del programa (varios tamaños)
   src/win/logo_encabezado.bmp logo para el encabezado de la ventana del programa
+  src/win/logo_documento.bmp  logo del comprobante (pantalla, impresora y PDF)
+  logo/marca-agua-1/2.png     marcas de agua (PNG transparente) y src/win/marca1/2.bmp
 
 Requisitos: fonttools, Pillow, rsvg-convert (librsvg2-bin) y la fuente Roboto
 (paquete fonts-roboto-unhinted).
@@ -105,6 +107,66 @@ def icono_svg(pequeno=False):
             f'{grano(277, 222, 72, 13)}</svg>')
 
 
+def texto_en_arco(fuente, texto, cx, cy, radio, tam, color, arriba=True, espaciado=0.0):
+    """Texto curvo centrado arriba (se lee en el sentido del reloj) o abajo (se lee derecho).
+    En ambos casos las letras ocupan la franja entre "radio" y "radio + alto de mayúscula"."""
+    import math
+    f = TTFont(fuente)
+    glifos = f.getGlyphSet()
+    cmap = f.getBestCmap()
+    escala = tam / f["head"].unitsPerEm
+    mayuscula = f["OS/2"].sCapHeight * escala
+    nombres = [cmap[ord(c)] for c in texto]
+    avances = [glifos[n].width * escala for n in nombres]
+    r = radio if arriba else radio + mayuscula  # radio de la línea base
+    total = sum(avances) + espaciado * (len(nombres) - 1)
+    pen = SVGPathPen(glifos)
+    recorrido = -total / 2
+    for n, a in zip(nombres, avances):
+        centro = recorrido + a / 2
+        if arriba:
+            theta = -math.pi / 2 + centro / r
+            phi = theta + math.pi / 2
+        else:
+            theta = math.pi / 2 - centro / r
+            phi = theta - math.pi / 2
+        tx, ty = cx + r * math.cos(theta), cy + r * math.sin(theta)
+        cos_p, sin_p = math.cos(phi), math.sin(phi)
+        matriz = (cos_p * escala, sin_p * escala, sin_p * escala, -cos_p * escala,
+                  -cos_p * a / 2 + tx, -sin_p * a / 2 + ty)
+        glifos[n].draw(TransformPen(pen, matriz))
+        recorrido += a + espaciado
+    return f'<path fill="{color}" d="{pen.getCommands()}"/>'
+
+
+def marca_diagonal_svg(opacidad=0.10):
+    """Opción 1: UNIMAX en diagonal con granos de café."""
+    linea1, ancho1 = texto_svg(NEGRA, "BENEFICIO DE CAFÉ", 40, 300, 228, espaciado=6, color=CAFE)
+    linea2, ancho2 = texto_svg(NEGRA_ITALICA, "UNIMAX", 150, 300, 368, espaciado=6, color=CAFE)
+    sep = ancho1 / 2 + 32
+    granos = [grano(300 - sep, 214, 34, -32, CAFE), grano(300 + sep, 214, 34, 32, CAFE)]
+    granos += [grano(312 + dx, 410, 22, ang, CAFE) for dx, ang in ((-30, -70), (0, 90), (30, 70))]
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">{DEFS_GRANO}'
+            f'<g opacity="{opacidad}" transform="rotate(-32 300 300)">{linea1}{linea2}{"".join(granos)}</g></svg>')
+
+
+def marca_sello_svg(opacidad=0.10):
+    """Opción 2: sello redondo con un grano de café al centro."""
+    arriba = texto_en_arco(NEGRA, "BENEFICIO DE CAFÉ", 300, 300, 214, 40, CAFE, arriba=True, espaciado=5)
+    abajo = texto_en_arco(NEGRA_ITALICA, "UNIMAX", 300, 300, 214, 46, CAFE, arriba=False, espaciado=12)
+    separadores = grano(300 - 235, 300, 26, 0, CAFE) + grano(300 + 235, 300, 26, 0, CAFE)
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">{DEFS_GRANO}'
+            f'<g opacity="{opacidad}">'
+            f'<circle cx="300" cy="300" r="284" fill="none" stroke="{CAFE}" stroke-width="10"/>'
+            f'<circle cx="300" cy="300" r="196" fill="none" stroke="{CAFE}" stroke-width="4"/>'
+            f'{arriba}{abajo}{separadores}{grano(300, 300, 240, 22, CAFE)}</g></svg>')
+
+
+def bmp_8bits(imagen, ruta):
+    """BMP de 256 colores (más liviano dentro del .exe); GDI lo dibuja igual en pantalla e impresora."""
+    imagen.convert("RGB").quantize(colors=256, method=Image.Quantize.MEDIANCUT).save(ruta)
+
+
 def rasterizar(svg, ancho, fondo=None):
     cmd = ["rsvg-convert", "-w", str(ancho), "-f", "png"]
     if fondo:
@@ -130,10 +192,19 @@ def main():
     imagenes = [rasterizar(pequeno if t <= 32 else icono, t) for t in tamanos]
     imagenes[-1].save(WIN / "app.ico", format="ICO", sizes=[(t, t) for t in tamanos], append_images=imagenes[:-1])
 
-    # Encabezado de la ventana: fondo crema (sin transparencia, para GDI), al doble de tamaño
-    # para que se vea nítido en pantallas con escala.
-    encabezado = rasterizar(svg, 300, fondo=CREMA).convert("RGB")
-    encabezado.save(WIN / "logo_encabezado.bmp")
+    # Encabezado de la ventana: fondo crema, grande para que se vea nítido con escala de pantalla.
+    bmp_8bits(rasterizar(svg, 560, fondo=CREMA), WIN / "logo_encabezado.bmp")
+    # Logo del comprobante (pantalla, impresora y PDF): fondo blanco, buena resolución para imprimir.
+    bmp_8bits(rasterizar(svg, 900, fondo="#FFFFFF"), WIN / "logo_documento.bmp")
+
+    # Marcas de agua: PNG transparente (Excel y uso general) y BMP sobre blanco (programa e impresión).
+    for numero, crear in ((1, marca_diagonal_svg), (2, marca_sello_svg)):
+        marca = crear()
+        (LOGO / f"marca-agua-{numero}.svg").write_text(marca, encoding="utf-8")
+        rasterizar(marca, 900).save(LOGO / f"marca-agua-{numero}.png", optimize=True)
+        bmp_8bits(rasterizar(marca, 600, fondo="#FFFFFF"), WIN / f"marca{numero}.bmp")
+        # Versión un poco más visible para ver el diseño (no se usa en el programa).
+        rasterizar(crear(opacidad=0.9), 600, fondo="#FFFFFF").save(LOGO / f"marca-agua-{numero}-diseno.png")
     print("Logo generado en", LOGO, "y", WIN)
 
 

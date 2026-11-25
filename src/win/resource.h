@@ -10,7 +10,7 @@
 
 // ---------------------------------------------------------------- Plantillas de diálogo
 #define IDD_PAG_FACTURA 200
-#define IDD_PAG_HISTORIAL 201
+#define IDD_PAG_FACTURAS 201
 #define IDD_PAG_CLIENTES 202
 #define IDD_PAG_PRECIOS 203
 #define IDD_PAG_DEUDAS 204
@@ -26,6 +26,12 @@
 #define IDD_MOVIMIENTO 224
 #define IDD_TEXTO 225
 #define IDD_RECORDATORIO 226
+#define IDD_INGRESO 227
+#define IDD_CAMBIAR_CLAVE 228
+#define IDD_CODIGO 229
+#define IDD_AUTORIZAR 230
+#define IDD_USUARIOS 231
+#define IDD_USUARIO 232
 
 // ---------------------------------------------------------------- Menú
 #define IDM_RESPALDAR 40001
@@ -35,6 +41,9 @@
 #define IDM_ACERCA 40005
 #define IDM_PLANTILLAS 40006
 #define IDM_INSTALAR 40007
+#define IDM_CAMBIAR_CLAVE 40008
+#define IDM_USUARIOS 40009
+#define IDM_CERRAR_SESION 40010
 
 // ---------------------------------------------------------------- Plantillas de Excel incluidas en el .exe
 #define IDR_PLT_FACTURA 300
@@ -45,8 +54,13 @@
 #define IDR_PLT_VENTAS 305
 #define IDR_PLT_CAJA 306
 
-// Logo para el encabezado de la ventana
+// Logo para el encabezado de la ventana, logo del comprobante y marcas de agua
 #define IDB_LOGO 310
+#define IDB_LOGO_DOC 311
+#define IDB_MARCA1 312
+#define IDB_MARCA2 313
+#define IDR_MARCA_PNG1 320
+#define IDR_MARCA_PNG2 321
 
 // ---------------------------------------------------------------- Comprobante de compra
 #define IDC_F_DNI 1001
@@ -75,6 +89,9 @@
 #define IDC_F_GUARDAR 1024
 #define IDC_F_LIMPIAR 1025
 #define IDC_F_PESO_INFO 1026
+#define IDC_F_LBL_DNI 1030
+#define IDC_F_LBL_NOMBRE 1031
+#define IDC_F_LBL_TEL 1032
 
 // ---------------------------------------------------------------- Historial
 #define IDC_H_DESDE 1101
@@ -87,6 +104,10 @@
 #define IDC_H_RESUMEN 1108
 #define IDC_H_HOY 1109
 #define IDC_H_MES 1110
+#define IDC_H_CLIENTES 1111
+#define IDC_H_VER 1112
+#define IDC_H_CARPETA 1113
+#define IDC_H_EXCEL 1114
 
 // ---------------------------------------------------------------- Clientes
 #define IDC_C_NOMBRE 1201
@@ -207,6 +228,13 @@
 #define IDC_G_CARPETA 1817
 #define IDC_G_GUARDAR 1818
 #define IDC_G_PROBAR 1819
+#define IDC_G_IMPRESORA 1820
+#define IDC_G_COPIAS 1821
+#define IDC_G_PDF_COMP 1822
+#define IDC_G_MARCA 1823
+#define IDC_G_USUARIOS 1824
+#define IDC_G_CLAVE 1825
+#define IDC_G_PROBAR_IMP 1826
 
 // ---------------------------------------------------------------- Diálogos
 #define IDC_S_BUSCAR 2001
@@ -251,6 +279,42 @@
 #define IDC_RC_LISTA 2602
 #define IDC_RC_IR 2603
 #define IDC_RC_EXCEL 2604
+
+#define IDC_L_LOGO 2701
+#define IDC_L_TITULO 2702
+#define IDC_L_USUARIO 2703
+#define IDC_L_CLAVE 2704
+#define IDC_L_INFO 2705
+#define IDC_L_AYUDA 2706
+#define IDC_L_OLVIDO 2707
+
+#define IDC_K2_INFO 2801
+#define IDC_K2_ACTUAL 2802
+#define IDC_K2_ACTUAL_LBL 2803
+#define IDC_K2_NUEVA 2804
+#define IDC_K2_REPETIR 2805
+
+#define IDC_C2_CODIGO 2901
+
+#define IDC_A2_INFO 3101
+#define IDC_A2_USUARIO 3102
+#define IDC_A2_CLAVE 3103
+
+#define IDC_U_LISTA 3201
+#define IDC_U_NUEVO 3202
+#define IDC_U_EDITAR 3203
+#define IDC_U_CLAVE 3204
+#define IDC_U_CODIGO 3205
+
+#define IDC_U2_USUARIO 3301
+#define IDC_U2_NOMBRE 3302
+#define IDC_U2_ROL 3303
+#define IDC_U2_CLAVE 3304
+#define IDC_U2_REPETIR 3305
+#define IDC_U2_CLAVE_LBL 3306
+#define IDC_U2_REPETIR_LBL 3307
+#define IDC_U2_ACTIVO 3308
+#define IDC_U2_CAMBIAR 3309
 
 // Control de pestañas de la ventana principal.
 #define IDC_PESTANAS 3000

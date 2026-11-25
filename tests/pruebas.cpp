@@ -11,6 +11,8 @@
 #include <string>
 
 #include "core/Documentos.h"
+#include "core/Grafico.h"
+#include "core/Seguridad.h"
 #include "core/Identificacion.h"
 #include "core/NumeroLetras.h"
 #include "core/Texto.h"
@@ -96,6 +98,8 @@ static void pruebasDinero() {
     CHECK(!parsearDecimal("12a").has_value());
     CHECK_EQ(formatoDecimal(1234.5, 2), std::string("1,234.50"));
     CHECK_EQ(formatoDecimal(-0.001, 2), std::string("0.00"));
+    CHECK_EQ(formatoDecimal(1.255, 2), std::string("1.26"));
+    CHECK_EQ(formatoDecimal(aQuintales(125.5), 2), std::string("1.26"));
     CHECK_EQ(aLibras(2.5, Unidad::Quintales), 250.0);
     CHECK_EQ(aQuintales(125.0), 1.25);
     // 125.5 lb x L 45.75 = 5741.625 -> 5741.63
@@ -182,6 +186,39 @@ static void pruebasTextoYModelos() {
     CHECK_EQ(e.lineaDatos(), std::string("RTN 08019002267079  ·  Tel. 2222-3333"));
 }
 
+static std::string hexDe(const Sha256& h) { return aHex(h.data(), h.size()); }
+
+static void pruebasSeguridad() {
+    CHECK_EQ(hexDe(sha256("", 0)), std::string("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"));
+    CHECK_EQ(hexDe(sha256("abc", 3)), std::string("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"));
+    const std::string largo = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    CHECK_EQ(hexDe(sha256(largo.data(), largo.size())),
+             std::string("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"));
+    const std::string datos = "what do ya want for nothing?";
+    CHECK_EQ(hexDe(hmacSha256({'J', 'e', 'f', 'e'}, datos.data(), datos.size())),
+             std::string("5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"));
+    // RFC 7914 (PBKDF2-HMAC-SHA256), primeros 32 bytes
+    CHECK_EQ(hexDe(pbkdf2Sha256("passwd", {'s', 'a', 'l', 't'}, 1)),
+             std::string("55ac046e56e3089fec1691c22544b605f94185216dde0465e68b9d57c20dacbc"));
+    CHECK_EQ(hexDe(pbkdf2Sha256("Password", {'N', 'a', 'C', 'l'}, 80000)),
+             std::string("4ddcd8f60b98be21830cee5ef22701f9641a4418d04c0414aeff08876b34ab56"));
+    const std::string h = crearHashContrasena("Cafe2026", {9, 8, 7, 6, 5, 4, 3, 2}, 1000);
+    CHECK(verificarContrasena("Cafe2026", h));
+    CHECK(!verificarContrasena("cafe2026", h));
+    CHECK(!verificarContrasena("Cafe2026", "basura"));
+    CHECK(!validarContrasenaNueva("abc", "juan").empty());
+    CHECK(!validarContrasenaNueva("solotexto", "juan").empty());
+    CHECK(!validarContrasenaNueva(CONTRASENA_INICIAL, "admin").empty());
+    CHECK(validarContrasenaNueva("Beneficio25", "admin").empty());
+    const std::string codigo = codigoRecuperacion({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
+    CHECK_EQ(codigo.size(), static_cast<size_t>(14));
+    CHECK_EQ(normalizarCodigo(" " + codigo.substr(0, 4) + " " + codigo.substr(5)), normalizarCodigo(codigo));
+    CHECK_EQ(nombreCarpetaCliente("Juan: Pérez / López?", "0801-1990-12345"),
+             std::string("Juan Pérez López (0801-1990-12345)"));
+    CHECK(tieneLetras("José"));
+    CHECK(!tieneLetras("0801-1990"));
+}
+
 // ====================================================================== Base de datos
 static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     db::crearEsquema(con, dialecto);
@@ -199,6 +236,47 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     repo.setConfig("ClaveNueva", "x");
     CHECK_EQ(repo.config("ClaveNueva"), std::string("x"));
     CHECK_EQ(repo.configEntero("NumeroInicialFactura", 1), 100L);
+
+    // --- Usuarios
+    repo.usarIteracionesHash(1000);
+    const std::vector<uint8_t> sal = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    repo.asegurarUsuarioMaestro(sal);
+    repo.asegurarUsuarioMaestro(sal);  // no crea otro
+    CHECK_EQ(repo.usuarios().size(), static_cast<size_t>(1));
+    auto admin = repo.autenticar("ADMIN ", CONTRASENA_INICIAL);
+    CHECK(admin.has_value());
+    CHECK(admin && admin->esAdministrador() && admin->debeCambiar);
+    CHECK(!repo.autenticar("admin", "otra").has_value());
+    CHECK(!repo.autenticar("nadie", CONTRASENA_INICIAL).has_value());
+    CHECK_ERROR_NEGOCIO(repo.cambiarContrasena(admin->id, CONTRASENA_INICIAL, sal));
+    repo.cambiarContrasena(admin->id, "Maestra2026", sal);
+    CHECK(!repo.autenticar("admin", CONTRASENA_INICIAL).has_value());
+    CHECK(!repo.autenticar("admin", "Maestra2026")->debeCambiar);
+    Usuario cajero;
+    cajero.usuario = "Cajero1";
+    cajero.nombre = "Ana Cruz";
+    cajero.rol = ROL_OPERADOR;
+    repo.crearUsuario(cajero, "Caja2026", sal);
+    CHECK_EQ(cajero.usuario, std::string("cajero1"));
+    CHECK_ERROR_NEGOCIO(repo.crearUsuario(cajero, "Caja2026", sal));  // repetido
+    Usuario malo;
+    malo.usuario = "con espacio";
+    CHECK_ERROR_NEGOCIO(repo.crearUsuario(malo, "Caja2026", sal));
+    CHECK(repo.autenticar("cajero1", "Caja2026").has_value());
+    // No se puede dejar el sistema sin administradores.
+    Usuario soloAdmin = *repo.usuarioPorId(admin->id);
+    soloAdmin.activo = false;
+    CHECK_ERROR_NEGOCIO(repo.guardarUsuario(soloAdmin));
+    soloAdmin.activo = true;
+    soloAdmin.rol = ROL_OPERADOR;
+    CHECK_ERROR_NEGOCIO(repo.guardarUsuario(soloAdmin));
+    cajero.activo = false;
+    repo.guardarUsuario(cajero);
+    CHECK(!repo.autenticar("cajero1", "Caja2026").has_value());
+    repo.guardarCodigoRecuperacion("ABCD-EFGH-JKLM", sal);
+    CHECK(repo.verificarCodigoRecuperacion("abcd efgh jklm"));
+    CHECK(!repo.verificarCodigoRecuperacion("ABCD-EFGH-JKLN"));
+    repo.usarUsuario("admin");
 
     // --- Clientes
     Cliente juan;
@@ -261,6 +339,7 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     repo.registrarFactura(f);
     CHECK(f.id > 0);
     CHECK_EQ(f.numero, 100L);
+    CHECK_EQ(f.usuario, std::string("admin"));
     CHECK_EQ(f.total, 832300LL);
     CHECK_EQ(f.saldo, 332300LL);
     auto fl = repo.facturaPorId(f.id);
@@ -345,6 +424,8 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     CHECK_EQ(rc.esperado, -100000LL + 4150000LL - 600000LL);
     CHECK(!rc.bloqueada);
     CHECK_EQ(repo.movimientos(hoy).size(), static_cast<size_t>(5));
+    CHECK_EQ(repo.movimientos(hoy)[0].usuario, std::string("admin"));
+    CHECK_EQ(repo.facturaPorId(f.id)->usuario, std::string("admin"));
 
     // Movimiento manual y su eliminación
     const long manual = repo.registrarMovimientoManual(hoy, TipoMovimiento::Ingreso, 1000000, "Fondo del dueño");
@@ -433,6 +514,16 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     CHECK(letras);
     CHECK(anulado);
     CHECK_EQ(doc.tablas[0].filas.size(), static_cast<size_t>(2));
+    CHECK_EQ(doc.subcarpeta, std::string("Facturas\\Juan Pérez (0801-1990-12345)"));
+    const Lienzo lz = lienzoComprobante(emp, *repo.facturaPorId(f.id), *repo.clientePorId(juan.id), MARCA_DIAGONAL);
+    bool hayNumero = false, hayAnulado = false, hayMarca = false;
+    for (const auto& e : lz.elementos) {
+        if (e.texto == "000100") hayNumero = true;
+        if (e.texto == "ANULADO") hayAnulado = true;
+        if (e.imagen == "marca1") hayMarca = true;
+        CHECK(e.x >= 0 && e.y >= 0 && e.x + e.ancho <= lz.ancho + 0.01 && e.y + e.alto <= lz.alto + 0.01);
+    }
+    CHECK(hayNumero && hayAnulado && hayMarca);
     Documento dc = docCierreCaja(emp, repo.resumenCaja(hoy), repo.movimientos(hoy));
     CHECK_EQ(dc.tablas[0].filas.size(), repo.movimientos(hoy).size());
     Documento dv = docReporteVentas(emp, hoy, hoy, repo.ventas(hoy, hoy));
@@ -472,6 +563,30 @@ int main(int argc, char** argv) {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
 #endif
+    if (argc > 2 && std::strcmp(argv[1], "--lienzo") == 0) {
+        // Comprobante de ejemplo para revisar el dibujo: pruebas --lienzo <marca 0|1|2>
+        Empresa e;
+        e.rtn = "08019002267079";
+        e.direccion = "Marcala, La Paz";
+        e.telefono = "2764-0000";
+        Factura f;
+        f.numero = 123;
+        f.fecha = Fecha(2026, 11, 25);
+        f.hora = "10:42:00";
+        f.usuario = "admin";
+        f.lineas.push_back({CAFE_SECO, 125.5, 0, 46.0, 0});
+        f.lineas.push_back({CAFE_UVA, 300, 40, 8.5, 0});
+        f.pagado = 500000;
+        f.vencimientoSaldo = Fecha(2026, 11, 30);
+        f.observaciones = "Primera entrega de la cosecha";
+        recalcularFactura(f);
+        Cliente c;
+        c.nombre = "Juan Antonio Pérez Hernández";
+        c.dni = "0801-1990-12345";
+        c.telefono = "9999-0000";
+        std::cout << lienzoJson(lienzoComprobante(e, f, c, std::atoi(argv[2])));
+        return 0;
+    }
     if (argc > 1 && std::strcmp(argv[1], "--nombres") == 0) {
         for (const auto& p : nombresPorPlantilla()) {
             std::cout << p.first;
@@ -485,6 +600,7 @@ int main(int argc, char** argv) {
     pruebasIdentificacion();
     pruebasNumeroLetras();
     pruebasTextoYModelos();
+    pruebasSeguridad();
     try {
         if (ejecutarPruebasBD() != 0) return 1;
     } catch (const std::exception& e) {

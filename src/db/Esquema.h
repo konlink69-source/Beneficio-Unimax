@@ -8,7 +8,7 @@ namespace bu::db {
 
 enum class Dialecto { Access, SQLite };
 
-constexpr int VERSION_ESQUEMA = 1;
+constexpr int VERSION_ESQUEMA = 2;
 
 // Crea las tablas que falten y los datos iniciales. Se puede llamar en cada arranque.
 void crearEsquema(Conexion& c, Dialecto d);

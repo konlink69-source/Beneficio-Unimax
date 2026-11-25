@@ -30,6 +30,10 @@ public:
     }
     // Tecla Enter dentro de la pestaña.
     virtual void alAceptar() {}
+    // Se llama al cambiar el tamaño. Por defecto estira "controlEstirable_" hasta el borde.
+    virtual void alRedimensionar(int ancho, int alto);
+    // Pone (o quita) la marca de agua en la tabla principal de la pestaña.
+    void aplicarMarcaAgua(int marca);
 
 protected:
     // Control (normalmente una tabla) que se estira hasta el borde inferior derecho.
@@ -39,13 +43,15 @@ protected:
     void colorTexto(int id, COLORREF color);
     HWND h_ = nullptr;
 
+    // Estira un control hasta el borde derecho y/o inferior de la pestaña.
+    void estirar(int id, int ancho, int alto, bool horizontal, bool vertical);
+
 private:
-    void redimensionar(int ancho, int alto);
     static INT_PTR CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp);
 };
 
 std::unique_ptr<Pagina> crearPaginaFactura();
-std::unique_ptr<Pagina> crearPaginaHistorial();
+std::unique_ptr<Pagina> crearPaginaFacturas();
 std::unique_ptr<Pagina> crearPaginaClientes();
 std::unique_ptr<Pagina> crearPaginaPrecios();
 std::unique_ptr<Pagina> crearPaginaDeudas();

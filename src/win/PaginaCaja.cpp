@@ -4,6 +4,7 @@
 #include "win/Dialogos.h"
 #include "win/Excel.h"
 #include "win/Paginas.h"
+#include "win/Sesion.h"
 #include "win/resource.h"
 
 namespace bu::win {
@@ -25,7 +26,8 @@ public:
                       {L"Concepto", 200},
                       {L"Referencia", 80},
                       {L"Entrada", 70, true},
-                      {L"Salida", 70, true}});
+                      {L"Salida", 70, true},
+                      {L"Usuario", 54}});
         ponerFuente(h_, IDC_K_ESTADO, fuenteNegrita());
         ponerFuente(h_, IDC_K_ESPERADO, fuenteGrande());
         ponerFuente(h_, IDC_K_DIFERENCIA, fuenteNegrita());
@@ -127,7 +129,7 @@ private:
             lvAgregar(h_, IDC_K_LISTA,
                       {m.hora.substr(0, 5), entrada ? "Entrada" : "Salida", nombreOrigenMovimiento(m.origen), m.concepto,
                        m.referencia, entrada ? formatoLempiras(m.monto) : std::string(),
-                       entrada ? std::string() : formatoLempiras(m.monto)},
+                       entrada ? std::string() : formatoLempiras(m.monto), m.usuario},
                       m.id);
             colores_[m.id] = entrada ? COLOR_VERDE : COLOR_ROJO;
         }
@@ -179,6 +181,7 @@ private:
         const Fecha f = leerFecha(h_, IDC_K_FECHA);
         if (!confirmar(h_, "¿Reabrir la caja del " + f.texto() + "? Se borrará el cierre y podrá registrar movimientos de nuevo."))
             return;
+        if (!autorizar(h_, "reabrir la caja")) return;
         if (intentar(h_, [&] { repo().reabrirCaja(f); })) cargar(false);
     }
 
@@ -189,6 +192,7 @@ private:
             return;
         }
         if (!confirmar(h_, "¿Eliminar el movimiento seleccionado?")) return;
+        if (!autorizar(h_, "eliminar un movimiento de caja")) return;
         if (intentar(h_, [&] { repo().eliminarMovimientoManual(id); })) cargar(false);
     }
 

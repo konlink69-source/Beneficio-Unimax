@@ -5,6 +5,7 @@
 #include "win/App.h"
 #include "win/Dialogos.h"
 #include "win/Paginas.h"
+#include "win/Sesion.h"
 #include "win/resource.h"
 
 namespace bu::win {
@@ -92,10 +93,7 @@ public:
     }
 
     void alAceptar() override {
-        if (comprador_.tieneFoco()) {
-            comprador_.buscar();
-            return;
-        }
+        if (comprador_.alPresionarEnter()) return;
         guardar();
     }
 
@@ -217,6 +215,7 @@ private:
                 aviso += "\n\nSe registrará en la caja de HOY una salida de " + formatoLempiras(v.recibido) +
                          " (devolución de lo cobrado).";
             if (!confirmar(h_, aviso)) return;
+            if (!autorizar(h_, "anular una venta")) return;
             const auto motivo = pedirTexto(h_, "Anular venta", "Escriba el motivo de la anulación:");
             if (!motivo) return;
             if (intentar(h_, [&] { repo().anularVenta(id, *motivo, Fecha::hoy()); })) listar();

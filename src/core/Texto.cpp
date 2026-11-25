@@ -61,4 +61,38 @@ bool coincideBusqueda(const std::string& texto, const std::string& filtro) {
     return false;
 }
 
+bool tieneLetras(const std::string& texto) {
+    for (char ch : texto) {
+        const unsigned char c = static_cast<unsigned char>(ch);
+        if (std::isalpha(c) || c >= 0x80) return true;
+    }
+    return false;
+}
+
+std::string nombreCarpetaCliente(const std::string& nombre, const std::string& dni) {
+    std::string r;
+    for (char ch : recortar(nombre)) {
+        // Caracteres no permitidos en nombres de carpeta de Windows.
+        if (std::string("\\/:*?\"<>|").find(ch) != std::string::npos || static_cast<unsigned char>(ch) < 32) {
+            r += ' ';
+            continue;
+        }
+        r += ch;
+    }
+    // Sin espacios dobles ni punto o espacio al final.
+    std::string limpio;
+    for (char ch : r)
+        if (!(ch == ' ' && !limpio.empty() && limpio.back() == ' ')) limpio += ch;
+    while (!limpio.empty() && (limpio.back() == ' ' || limpio.back() == '.')) limpio.pop_back();
+    if (limpio.size() > 80) {
+        limpio.resize(80);
+        // No dejar una letra con tilde cortada a la mitad (UTF-8).
+        while (!limpio.empty() && (static_cast<unsigned char>(limpio.back()) & 0xC0) == 0x80) limpio.pop_back();
+        if (!limpio.empty() && static_cast<unsigned char>(limpio.back()) >= 0xC0) limpio.pop_back();
+    }
+    while (!limpio.empty() && (limpio.back() == ' ' || limpio.back() == '.')) limpio.pop_back();
+    if (limpio.empty()) limpio = "Cliente";
+    return dni.empty() ? limpio : limpio + " (" + dni + ")";
+}
+
 }  // namespace bu

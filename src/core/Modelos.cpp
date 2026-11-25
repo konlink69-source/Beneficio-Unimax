@@ -110,6 +110,16 @@ std::string Recordatorio::resumenCorto() const {
     return r;
 }
 
+const char* nombreRol(int rol) { return rol == ROL_ADMINISTRADOR ? "Administrador" : "Operador"; }
+
+const char* nombreMarcaAgua(int marca) {
+    switch (marca) {
+        case MARCA_DIAGONAL: return "Opción 1: UNIMAX en diagonal con granos de café";
+        case MARCA_SELLO: return "Opción 2: sello redondo con grano de café";
+        default: return "Sin marca de agua";
+    }
+}
+
 std::string Empresa::lineaDatos() const {
     std::string r;
     auto agregar = [&r](const std::string& s) {

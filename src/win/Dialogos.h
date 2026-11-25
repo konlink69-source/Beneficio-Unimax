@@ -30,6 +30,13 @@ protected:
     }
     // Se llama al presionar Aceptar/Enter. Devuelve true para cerrar el diálogo.
     virtual bool alAceptar() { return true; }
+    // Colores de fondo (WM_CTLCOLOR...). Devuelve un HBRUSH o 0 para usar los de Windows.
+    virtual INT_PTR alColor(UINT msg, HDC dc, HWND control) {
+        (void)msg;
+        (void)dc;
+        (void)control;
+        return 0;
+    }
     HWND h_ = nullptr;
 
 private:
@@ -44,10 +51,15 @@ public:
     void configurar(HWND dlg, int idDni, int idNombre, int idTelefono, int idInfo, int tipoCliente);
     bool comando(int id, int codigo);  // procesa los eventos de los campos; true si los atendió
     void buscar();                     // busca por el DNI escrito
-    void elegir();                     // abre la ventana de búsqueda por nombre
+    void elegir(const std::string& filtro = std::string());  // ventana de búsqueda por nombre o DNI
+    // Tecla Enter: en el campo DNI busca por DNI o, si se escribió un nombre, abre la búsqueda
+    // por nombre; en el campo Nombre abre la búsqueda si hay clientes parecidos.
+    // Devuelve true si atendió la tecla.
+    bool alPresionarEnter();
     void poner(const Cliente& c);
     void limpiar();
     bool tieneFoco() const;
+    bool hayCliente() const { return cliente_.has_value(); }  // el cliente ya está registrado
     // Devuelve el cliente registrado o lo registra (lanza ErrorNegocio si faltan datos).
     Cliente obtenerORegistrar();
 
@@ -60,7 +72,7 @@ private:
     bool poniendo_ = false;
 };
 
-std::optional<Cliente> seleccionarCliente(HWND padre);
+std::optional<Cliente> seleccionarCliente(HWND padre, const std::string& filtroInicial = std::string());
 bool dialogoNuevaDeuda(HWND padre);
 void dialogoDetalleDeuda(HWND padre, long deudaId);
 bool dialogoAbono(HWND padre, long deudaId);

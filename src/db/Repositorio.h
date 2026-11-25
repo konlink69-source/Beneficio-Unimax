@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "core/Modelos.h"
+#include "core/Seguridad.h"
 #include "db/Esquema.h"
 #include "db/Odbc.h"
 
@@ -31,6 +32,26 @@ enum class ResultadoEliminar { Eliminado, Desactivado };
 class Repositorio {
 public:
     Repositorio(db::Conexion& c, db::Dialecto d) : c_(c), d_(d) {}
+
+    // Usuario que queda registrado en cada operación (el que inició sesión).
+    void usarUsuario(const std::string& usuario) { usuario_ = usuario; }
+    const std::string& usuarioActual() const { return usuario_; }
+    // Para las pruebas: menos iteraciones del cifrado de contraseñas.
+    void usarIteracionesHash(uint32_t n) { iteraciones_ = n; }
+
+    // ------------------------------------------------ Usuarios
+    // Si no hay usuarios, crea el usuario maestro "admin" con la contraseña inicial.
+    void asegurarUsuarioMaestro(const std::vector<uint8_t>& sal);
+    std::vector<Usuario> usuarios();
+    std::optional<Usuario> usuarioPorId(long id);
+    // Devuelve el usuario si el nombre y la contraseña son correctos (y está activo).
+    std::optional<Usuario> autenticar(const std::string& usuario, const std::string& contrasena);
+    long crearUsuario(Usuario& u, const std::string& contrasena, const std::vector<uint8_t>& sal);
+    void guardarUsuario(const Usuario& u);  // nombre, rol y si está activo
+    void cambiarContrasena(long id, const std::string& nueva, const std::vector<uint8_t>& sal, bool debeCambiar = false);
+    // Código para recuperar el acceso si se olvida la contraseña del administrador.
+    void guardarCodigoRecuperacion(const std::string& codigo, const std::vector<uint8_t>& sal);
+    bool verificarCodigoRecuperacion(const std::string& codigo);
 
     // ------------------------------------------------ Configuración
     std::string config(const std::string& clave, const std::string& porDefecto = std::string());
@@ -108,8 +129,12 @@ private:
     std::optional<Deuda> deudaDeComprobante(const char* columna, long id);
     std::pair<Centavos, Centavos> sumarMovimientos(const std::string& condicion, const std::vector<Fecha>& fechas);
 
+    int administradoresActivos(long excepto);
+
     db::Conexion& c_;
     db::Dialecto d_;
+    std::string usuario_;
+    uint32_t iteraciones_ = ITERACIONES_HASH;
 };
 
 }  // namespace bu

@@ -66,6 +66,7 @@ struct Factura {  // Comprobante de compra de café
     std::string observaciones;
     bool anulada = false;
     double totalLibras = 0;  // usado en listados
+    std::string usuario;     // quién lo registró
 };
 
 // Calcula subtotales, total y saldo.
@@ -163,6 +164,7 @@ struct MovimientoCaja {
     std::string concepto;
     std::string referencia;
     Centavos monto = 0;
+    std::string usuario;  // quién lo registró
 };
 std::string nombreOrigenMovimiento(const std::string& origen);
 
@@ -205,6 +207,24 @@ struct Recordatorio {
     bool hayAlgo() const { return hayDeudasUrgentes() || faltaPrecioHoy || diaSinCerrar.has_value(); }
     std::string resumenCorto() const;
 };
+
+// ---------------------------------------------------------------- Usuarios
+enum RolUsuario { ROL_ADMINISTRADOR = 1, ROL_OPERADOR = 2 };
+const char* nombreRol(int rol);
+
+struct Usuario {
+    long id = 0;
+    std::string usuario;  // nombre para ingresar (sin espacios)
+    std::string nombre;   // nombre completo
+    int rol = ROL_OPERADOR;
+    bool activo = true;
+    bool debeCambiar = false;  // debe cambiar la contraseña al ingresar
+    bool esAdministrador() const { return rol == ROL_ADMINISTRADOR; }
+};
+
+// Marca de agua de la aplicación y los documentos.
+enum MarcaAgua { MARCA_NINGUNA = 0, MARCA_DIAGONAL = 1, MARCA_SELLO = 2 };
+const char* nombreMarcaAgua(int marca);
 
 // ---------------------------------------------------------------- Empresa
 struct Empresa {

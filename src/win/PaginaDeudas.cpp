@@ -5,6 +5,7 @@
 #include "win/Dialogos.h"
 #include "win/Excel.h"
 #include "win/Paginas.h"
+#include "win/Sesion.h"
 #include "win/resource.h"
 
 namespace bu::win {
@@ -150,6 +151,7 @@ private:
         if (d->afectoCaja)
             aviso += "\n\nComo esta deuda movió dinero de caja, se registrará el movimiento contrario en la caja de HOY.";
         if (!confirmar(h_, aviso)) return;
+        if (!autorizar(h_, "anular una deuda")) return;
         if (intentar(h_, [&] { repo().anularDeuda(id, Fecha::hoy()); })) cargar();
     }
 

@@ -24,7 +24,7 @@ struct Rutas {
 // Páginas (pestañas) de la ventana principal.
 enum IndicePagina {
     PAG_FACTURA = 0,
-    PAG_HISTORIAL,
+    PAG_FACTURAS,
     PAG_CLIENTES,
     PAG_PRECIOS,
     PAG_DEUDAS,
@@ -38,6 +38,7 @@ enum IndicePagina {
 constexpr UINT WM_APP_INICIO = WM_APP + 1;
 constexpr UINT WM_APP_RECORDATORIO = WM_APP + 2;
 constexpr UINT WM_APP_IR_PAGINA = WM_APP + 3;
+constexpr UINT WM_APP_MARCA_AGUA = WM_APP + 4;  // cambió la marca de agua en Configuración
 extern const wchar_t* const CLASE_VENTANA;
 
 class App {
@@ -55,6 +56,19 @@ public:
     void mostrarRecordatorio(HWND padre, bool forzado);
     void irAPagina(int indice);
 
+    // ------------------------------------------------ Sesión
+    const Usuario& usuario() const { return usuario_; }
+    void establecerUsuario(const Usuario& u);
+    bool haySesion() const { return usuario_.id != 0; }
+
+    // ------------------------------------------------ Marca de agua (0 = ninguna, 1 o 2)
+    int marcaAgua();
+    // Imagen nueva para el fondo de una tabla (la tabla se queda con ella).
+    HBITMAP marcaAguaParaLista(int marca);
+    std::wstring rutaMarcaAguaPng(int marca) const;
+    // Avisa a la ventana principal para que actualice las tablas.
+    void refrescarMarcaAgua();
+
     HINSTANCE hInst = nullptr;
     HWND ventana = nullptr;
 
@@ -65,6 +79,7 @@ private:
     Rutas rutas_;
     db::Conexion conexion_;
     std::unique_ptr<Repositorio> repo_;
+    Usuario usuario_;
 };
 
 inline Repositorio& repo() { return App::instancia().repo(); }

@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <commctrl.h>
 
+#include <cstdint>
 #include <exception>
 #include <initializer_list>
 #include <optional>
@@ -78,15 +79,25 @@ bool intentar(HWND padre, F&& accion) {
 }
 
 // ------------------------------------------------ Fuentes y colores
+// Tamaño de letra de las ventanas (en puntos). Se elige al iniciar según el tamaño de la
+// pantalla, para que las pestañas llenen la ventana (todas las ventanas crecen con la letra).
+void establecerTamanoLetra(int puntos);
+int tamanoLetra();
+HFONT fuente(double puntos, bool negrita);
 HFONT fuenteNormal();
 HFONT fuenteNegrita();
 HFONT fuenteGrande();
+HFONT fuenteEtiqueta();  // etiquetas destacadas (DNI, Nombre, Teléfono)
+// Copia de una plantilla de diálogo de app.rc con el tamaño de letra actual.
+std::vector<BYTE> plantillaDialogo(int id, int puntos);
+// Texto gris de ayuda dentro de un campo vacío.
+void textoGuia(HWND dlg, int id, const std::wstring& texto);
 void ponerFuente(HWND dlg, int id, HFONT f);
 
 constexpr COLORREF COLOR_ROJO = RGB(192, 0, 0);
 constexpr COLORREF COLOR_NARANJA = RGB(200, 100, 0);
 constexpr COLORREF COLOR_VERDE = RGB(0, 120, 0);
-constexpr COLORREF COLOR_CAFE = RGB(91, 58, 41);
+constexpr COLORREF COLOR_CAFE = RGB(74, 30, 27);  // café del logo
 constexpr COLORREF COLOR_GRIS = RGB(110, 110, 110);
 
 // ------------------------------------------------ Archivos
@@ -94,6 +105,18 @@ bool existeArchivo(const std::wstring& ruta);
 void crearCarpetas(const std::wstring& ruta);
 void abrirCarpeta(const std::wstring& ruta);
 std::wstring carpetaDe(const std::wstring& ruta);
+
+// ------------------------------------------------ Imágenes incluidas en el .exe (BMP)
+struct ImagenDib {
+    const BITMAPINFO* info = nullptr;
+    const void* bits = nullptr;
+    int ancho = 0;
+    int alto = 0;
+};
+ImagenDib imagenRecurso(int id);
+
+// ------------------------------------------------ Números aleatorios seguros (sal y códigos)
+std::vector<uint8_t> bytesAleatorios(size_t n);
 
 // Cursor de espera mientras exista el objeto.
 class CursorEspera {

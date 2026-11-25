@@ -4,6 +4,7 @@
 
 #include "core/Identificacion.h"
 #include "core/NumeroLetras.h"
+#include "core/Texto.h"
 
 namespace bu {
 
@@ -41,7 +42,7 @@ void encabezado(Documento& d, const Empresa& e) {
 Documento docComprobanteCompra(const Empresa& e, const Factura& f, const Cliente& c) {
     Documento d;
     d.plantilla = "Factura.xlsx";
-    d.subcarpeta = "Comprobantes";
+    d.subcarpeta = "Facturas\\" + nombreCarpetaCliente(c.nombre, c.dni);  // una carpeta por cliente
     d.nombreArchivo = "Comprobante_" + numero6(f.numero);
     encabezado(d, e);
     d.celdas.push_back({"NUMERO", T(numero6(f.numero))});

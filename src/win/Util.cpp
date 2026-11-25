@@ -1,7 +1,10 @@
 #include "win/Util.h"
 
+#include <bcrypt.h>
 #include <shellapi.h>
 #include <shlobj.h>
+
+#include <random>
 
 #include "db/Odbc.h"
 #include "db/Repositorio.h"
@@ -202,31 +205,100 @@ void mostrarExcepcion(HWND padre, const std::exception& e) {
 
 // ================================================================ Fuentes
 namespace {
-HFONT crearFuente(int puntos, int peso) {
+int g_puntos = 9;
+
+HFONT crearFuente(double puntos, int peso) {
     HDC dc = GetDC(nullptr);
-    const int alto = -MulDiv(puntos, GetDeviceCaps(dc, LOGPIXELSY), 72);
+    const int alto = -static_cast<int>(puntos * GetDeviceCaps(dc, LOGPIXELSY) / 72.0 + 0.5);
     ReleaseDC(nullptr, dc);
     return CreateFontW(alto, 0, 0, 0, peso, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
                        CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
 }
 }  // namespace
 
-HFONT fuenteNormal() {
-    static HFONT f = crearFuente(9, FW_NORMAL);
+void establecerTamanoLetra(int puntos) { g_puntos = puntos < 8 ? 8 : (puntos > 16 ? 16 : puntos); }
+int tamanoLetra() { return g_puntos; }
+
+HFONT fuente(double puntos, bool negrita) {
+    // Las fuentes se crean una sola vez por tamaño y se reutilizan.
+    static std::vector<std::pair<std::pair<int, bool>, HFONT>> cache;
+    const int clave = static_cast<int>(puntos * 10 + 0.5);
+    for (const auto& c : cache)
+        if (c.first.first == clave && c.first.second == negrita) return c.second;
+    HFONT f = crearFuente(puntos, negrita ? FW_BOLD : FW_NORMAL);
+    cache.push_back({{clave, negrita}, f});
     return f;
 }
 
-HFONT fuenteNegrita() {
-    static HFONT f = crearFuente(9, FW_BOLD);
-    return f;
+HFONT fuenteNormal() { return fuente(g_puntos, false); }
+HFONT fuenteNegrita() { return fuente(g_puntos, true); }
+HFONT fuenteGrande() { return fuente(g_puntos * 13.0 / 9.0, true); }
+HFONT fuenteEtiqueta() { return fuente(g_puntos * 12.0 / 9.0, true); }
+
+std::vector<BYTE> plantillaDialogo(int id, int puntos) {
+    HMODULE m = GetModuleHandleW(nullptr);
+    HRSRC r = FindResourceW(m, MAKEINTRESOURCEW(id), MAKEINTRESOURCEW(5));  // RT_DIALOG
+    if (!r) return {};
+    const BYTE* datos = static_cast<const BYTE*>(LockResource(LoadResource(m, r)));
+    std::vector<BYTE> v(datos, datos + SizeofResource(m, r));
+    auto palabra = [&v](size_t o) -> WORD { return o + 1 < v.size() ? static_cast<WORD>(v[o] | (v[o + 1] << 8)) : 0; };
+    if (palabra(0) != 1 || palabra(2) != 0xFFFF) return v;  // solo DLGTEMPLATEEX
+    const DWORD estilo = static_cast<DWORD>(palabra(12) | (palabra(14) << 16));
+    if (!(estilo & DS_SETFONT)) return v;
+    // Saltar menú, clase y título (ordinal o texto Unicode terminado en cero).
+    size_t o = 26;
+    for (int campo = 0; campo < 2; ++campo) {
+        const WORD w = palabra(o);
+        if (w == 0) o += 2;
+        else if (w == 0xFFFF) o += 4;
+        else {
+            while (palabra(o) != 0) o += 2;
+            o += 2;
+        }
+    }
+    while (palabra(o) != 0) o += 2;
+    o += 2;
+    if (o + 1 < v.size()) {
+        v[o] = static_cast<BYTE>(puntos & 0xFF);
+        v[o + 1] = static_cast<BYTE>(puntos >> 8);
+    }
+    return v;
 }
 
-HFONT fuenteGrande() {
-    static HFONT f = crearFuente(13, FW_BOLD);
-    return f;
+void textoGuia(HWND dlg, int id, const std::wstring& texto) {
+    SendDlgItemMessageW(dlg, id, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(texto.c_str()));
 }
 
 void ponerFuente(HWND dlg, int id, HFONT f) { SendDlgItemMessageW(dlg, id, WM_SETFONT, reinterpret_cast<WPARAM>(f), TRUE); }
+
+// ================================================================ Imágenes
+ImagenDib imagenRecurso(int id) {
+    ImagenDib r;
+    HMODULE m = GetModuleHandleW(nullptr);
+    HRSRC h = FindResourceW(m, MAKEINTRESOURCEW(id), MAKEINTRESOURCEW(2));  // RT_BITMAP
+    if (!h) return r;
+    const auto* bi = static_cast<const BITMAPINFO*>(LockResource(LoadResource(m, h)));
+    if (!bi) return r;
+    const BITMAPINFOHEADER& bh = bi->bmiHeader;
+    DWORD colores = bh.biClrUsed;
+    if (colores == 0 && bh.biBitCount <= 8) colores = 1u << bh.biBitCount;
+    r.info = bi;
+    r.bits = reinterpret_cast<const BYTE*>(bi) + bh.biSize + colores * sizeof(RGBQUAD);
+    r.ancho = bh.biWidth;
+    r.alto = bh.biHeight < 0 ? -bh.biHeight : bh.biHeight;
+    return r;
+}
+
+// ================================================================ Aleatorios
+std::vector<uint8_t> bytesAleatorios(size_t n) {
+    std::vector<uint8_t> r(n);
+    if (n == 0) return r;
+    if (BCryptGenRandom(nullptr, r.data(), static_cast<ULONG>(n), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
+        std::random_device rd;  // respaldo (no debería ocurrir)
+        for (auto& b : r) b = static_cast<uint8_t>(rd());
+    }
+    return r;
+}
 
 // ================================================================ Archivos
 bool existeArchivo(const std::wstring& ruta) { return GetFileAttributesW(ruta.c_str()) != INVALID_FILE_ATTRIBUTES; }

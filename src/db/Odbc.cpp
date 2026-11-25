@@ -164,6 +164,19 @@ bool Conexion::existeTabla(const std::string& nombre) {
     return existe;
 }
 
+bool Conexion::existeColumna(const std::string& tabla, const std::string& columna) {
+    SQLHSTMT h = SQL_NULL_HSTMT;
+    verificar(SQLAllocHandle(SQL_HANDLE_STMT, dbc_, &h), SQL_HANDLE_DBC, dbc_, "Consulta de columnas");
+    std::u16string t = aUtf16(tabla);
+    std::u16string c = aUtf16(columna);
+    SQLRETURN rc = SQLColumnsW(h, nullptr, 0, nullptr, 0, W(t), static_cast<SQLSMALLINT>(t.size()), W(c),
+                               static_cast<SQLSMALLINT>(c.size()));
+    bool existe = false;
+    if (SQL_SUCCEEDED(rc)) existe = SQL_SUCCEEDED(SQLFetch(h));
+    SQLFreeHandle(SQL_HANDLE_STMT, h);
+    return existe;
+}
+
 void Conexion::iniciarTransaccion() {
     verificar(SQLSetConnectAttr(dbc_, SQL_ATTR_AUTOCOMMIT, reinterpret_cast<SQLPOINTER>(static_cast<std::uintptr_t>(SQL_AUTOCOMMIT_OFF)), 0),
               SQL_HANDLE_DBC, dbc_, "Iniciar transacción");
