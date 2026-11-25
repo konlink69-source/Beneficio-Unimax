@@ -410,6 +410,38 @@ def reporte_caja():
     return wb
 
 
+def reporte_general():
+    wb, h = nuevo("General")
+    ws = h.ws
+    h.anchos({"A": 12, "B": 13, "C": 11, "D": 13, "E": 11, "F": 13, "G": 11, "H": 13, "I": 11, "J": 12})
+    h.encabezado_empresa("J", "REPORTE GENERAL DE COMPRAS POR DÍA")
+    ws.merge_cells("A4:F4")
+    h.etiqueta("G4", "Del:", alinear="right")
+    h.campo("DESDE", "H4", formato=FMT_FECHA, alinear="center")
+    h.etiqueta("I4", "al:", alinear="right")
+    h.campo("HASTA", "J4", formato=FMT_FECHA, alinear="center")
+    filas = [("Uva", "UVA_LB", "UVA_QQ"), ("Pergamino húmedo", "HUMEDO_LB", "HUMEDO_QQ"),
+             ("Pergamino seco", "SECO_LB", "SECO_QQ")]
+    h.encabezados_tabla(6, "A", ["Tipo de café", "Libras", "Quintales"])
+    for i, (texto, lb, qq) in enumerate(filas):
+        fila = 7 + i
+        h.texto(f"A{fila}", texto, negrita=True, fondo=CREMA)
+        h.campo(lb, f"B{fila}", formato=FMT_PESO, alinear="right")
+        h.campo(qq, f"C{fila}", formato=FMT_PESO, negrita=True, alinear="right")
+        for col in "ABC":
+            ws[f"{col}{fila}"].border = BORDE
+    h.texto("E7", "Total pergamino (qq):", negrita=True, combinar="E7:F7", fondo=CREMA)
+    h.campo("PERGAMINO_QQ", "G7", formato=FMT_PESO, negrita=True, alinear="right")
+    h.texto("E8", "Días con compras:", combinar="E8:F8", fondo=CREMA)
+    h.campo("DIAS_COMPRA", "G8", formato="0", alinear="right")
+    h.texto("A11", "DETALLE POR DÍA (no incluye facturas anuladas)", negrita=True, tam=12, color=CAFE)
+    h.encabezados_tabla(12, "A", ["Fecha", "Uva lb", "Uva qq", "P. húmedo lb", "P. húmedo qq", "P. seco lb",
+                                  "P. seco qq", "Pergamino total qq", "Facturas uva", "Facturas pergamino"])
+    h.nombre("DIAS", "A13")
+    h.pagina(horizontal=True, titulos="12:12")
+    return wb
+
+
 PLANTILLAS = {
     "Factura.xlsx": factura,
     "CierreCaja.xlsx": cierre_caja,
@@ -418,6 +450,7 @@ PLANTILLAS = {
     "ReporteCompras.xlsx": reporte_compras,
     "ReporteVentas.xlsx": reporte_ventas,
     "ReporteCaja.xlsx": reporte_caja,
+    "ReporteGeneral.xlsx": reporte_general,
 }
 
 

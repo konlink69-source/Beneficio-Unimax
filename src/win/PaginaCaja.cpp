@@ -120,6 +120,12 @@ private:
         if (const auto pendiente = repo().diaSinCerrar(f))
             aviso = "¡Atención! La caja del " + pendiente->texto() +
                     " no se cerró; sus movimientos ya están sumados en el saldo inicial de este día.";
+        if (f == Fecha::hoy()) {
+            App::instancia().actualizarCaja();
+            if (App::instancia().cajaBaja())
+                aviso = "¡Atención! Hay " + formatoLempiras(resumen_.cierre ? resumen_.cierre->efectivoContado : resumen_.esperado) +
+                        " en caja, menos del mínimo de " + formatoLempiras(App::instancia().minimoCaja()) + ". " + aviso;
+        }
         ponerTexto(h_, IDC_K_AVISO, aviso);
 
         lvLimpiar(h_, IDC_K_LISTA);

@@ -17,6 +17,8 @@ constexpr uint32_t GRIS_CLARO = 0x9A9A9A;
 constexpr uint32_t CREMA = 0xF5EBDD;
 constexpr uint32_t ROJO = 0xC00000;
 constexpr uint32_t BLANCO = 0xFFFFFF;
+constexpr uint32_t UVA = 0x9B1B30;        // rojo cereza
+constexpr uint32_t PERGAMINO = 0x8A5A3C;  // café claro
 
 double altoTexto(double puntos) { return puntos * 100.0 / 72.0 * 1.35; }
 
@@ -27,11 +29,6 @@ std::string precio(double p) {
     return s;
 }
 
-std::string numero6(long n) {
-    char buf[16];
-    std::snprintf(buf, sizeof buf, "%06ld", n);
-    return buf;
-}
 
 }  // namespace
 
@@ -115,15 +112,19 @@ Lienzo lienzoComprobante(const Empresa& e, const Factura& f, const Cliente& c, i
     // Título, número y fecha.
     y = 222;
     l.linea(izq, y - 8, der, y - 8, CAFE, 3);
-    l.texto(izq, y + 4, 470, "COMPROBANTE DE COMPRA DE CAFÉ", 16, true, NEGRO);
+    l.texto(izq, y, 470, "COMPROBANTE DE COMPRA DE CAFÉ", 15, true, NEGRO);
+    // Tipo de café bien visible: franja de color con "CAFÉ UVA" o "CAFÉ PERGAMINO".
+    const bool uva = f.categoria == CATEGORIA_UVA;
+    l.rectangulo(izq, y + 28, 330, 36, uva ? UVA : PERGAMINO);
+    l.texto(izq, y + 33, 330, uva ? "CAFÉ UVA" : "CAFÉ PERGAMINO", 18, true, BLANCO, ALINEAR_CENTRO);
     l.texto(540, y, 100, "No.", 11, true, CAFE, ALINEAR_DERECHA);
-    l.texto(645, y - 4, der - 645, numero6(f.numero), 18, true, ROJO, ALINEAR_DERECHA);
+    l.texto(645, y - 4, der - 645, f.numeroTexto(), 18, true, ROJO, ALINEAR_DERECHA);
     l.texto(540, y + 30, 100, "Fecha:", 11, true, CAFE, ALINEAR_DERECHA);
     l.texto(645, y + 30, der - 645, f.fecha.texto(), 11, false, NEGRO, ALINEAR_DERECHA);
-    if (f.anulada) l.texto(izq, y + 50, der - izq, "ANULADO", 24, true, ROJO, ALINEAR_CENTRO);
+    if (f.anulada) l.texto(390, y + 30, 150, "ANULADO", 20, true, ROJO, ALINEAR_CENTRO);
 
     // Cliente.
-    y = 300;
+    y = 298;
     l.texto(izq, y, 150, "Productor / cliente:", 10.5, true, CAFE);
     l.texto(205, y - 2, der - 205, c.nombre, 12);
     l.linea(205, y + 22, der, y + 22, GRIS_CLARO);
@@ -134,11 +135,18 @@ Lienzo lienzoComprobante(const Empresa& e, const Factura& f, const Cliente& c, i
     l.texto(445, y, 80, "Teléfono:", 10.5, true, CAFE, ALINEAR_DERECHA);
     l.texto(535, y - 2, der - 535, c.telefono, 12);
     l.linea(535, y + 22, der, y + 22, GRIS_CLARO);
+    y += 34;
+    l.texto(izq, y, 150, "RTN:", 10.5, true, CAFE);
+    l.texto(205, y - 2, 220, c.rtn, 12);
+    l.linea(205, y + 22, 430, y + 22, GRIS_CLARO);
+    l.texto(435, y, 90, "Carnet IHCAFE:", 10.5, true, CAFE, ALINEAR_DERECHA);
+    l.texto(535, y - 2, der - 535, c.carnet, 12);
+    l.linea(535, y + 22, der, y + 22, GRIS_CLARO);
 
     // Tabla de café pesado.
     const double col[] = {izq, 240, 340, 430, 520, 650, der};
     const char* const titulos[] = {"Tipo de café", "Libras", "Quintales", "Galones", "Precio por libra", "Subtotal"};
-    y = 385;
+    y = 418;
     const double altoEnc = 30, altoFila = 26;
     l.rectangulo(izq, y, der - izq, altoEnc, CAFE);
     for (int i = 0; i < 6; ++i) l.texto(col[i], y + 6, col[i + 1] - col[i], titulos[i], 9.5, true, BLANCO, ALINEAR_CENTRO);
@@ -209,14 +217,82 @@ Lienzo lienzoComprobante(const Empresa& e, const Factura& f, const Cliente& c, i
     l.texto(70, y + 6, 260, "Firma del productor", 10, false, NEGRO, ALINEAR_CENTRO);
     l.texto(520, y + 6, 260, "Entregado por (beneficio)", 10, false, NEGRO, ALINEAR_CENTRO);
 
-    // Pie.
-    l.texto(izq, 1005, der - izq,
-            "Pago calculado por peso en libras. 1 quintal = 100 libras. Los galones son un dato de referencia.", 8, false,
-            GRIS, ALINEAR_CENTRO);
-    std::string pie = "Comprobante interno de compra";
-    if (!f.usuario.empty()) pie += "  ·  Registrado por: " + f.usuario;
-    if (!f.hora.empty()) pie += "  ·  Hora: " + f.hora.substr(0, 5);
-    l.texto(izq, 1025, der - izq, pie, 8, false, GRIS, ALINEAR_CENTRO);
+    return l;
+}
+
+// ================================================================ Informe del día
+Lienzo lienzoInformeDia(const Empresa& e, const Fecha& dia, const ResumenDia& hoy, const ResumenDia& mes,
+                        const ResumenDia& cosecha, const Fecha& desdeCosecha) {
+    Lienzo l;
+    const double izq = 50, der = 800;
+    l.imagen(275, 28, 300, 115, "logo");
+    if (!e.lineaDatos().empty()) l.texto(izq, 148, der - izq, e.lineaDatos(), 9, false, GRIS, ALINEAR_CENTRO);
+    l.linea(izq, 178, der, 178, CAFE, 3);
+    l.texto(izq, 190, der - izq, "INFORME DEL DÍA", 20, true, NEGRO, ALINEAR_CENTRO);
+    l.texto(izq, 226, der - izq, dia.texto(), 13, false, CAFE, ALINEAR_CENTRO);
+
+    // Dos recuadros grandes: lo comprado hoy de uva y de pergamino.
+    auto recuadro = [&](double x, const char* titulo, uint32_t color, double libras, int comprobantes) {
+        l.rectangulo(x, 268, 360, 150, color);
+        l.texto(x, 280, 360, titulo, 15, true, BLANCO, ALINEAR_CENTRO);
+        l.texto(x, 312, 360, formatoDecimal(aQuintales(libras), 2) + " qq", 30, true, BLANCO, ALINEAR_CENTRO);
+        l.texto(x, 364, 360, formatoDecimal(libras, 2) + " libras", 13, false, BLANCO, ALINEAR_CENTRO);
+        l.texto(x, 388, 360, std::to_string(comprobantes) + (comprobantes == 1 ? " factura" : " facturas"), 11, false,
+                BLANCO, ALINEAR_CENTRO);
+    };
+    recuadro(izq, "UVA HOY", UVA, hoy.libras[CAFE_UVA], hoy.comprobantesUva);
+    recuadro(440, "PERGAMINO HOY", PERGAMINO, hoy.librasPergamino(), hoy.comprobantesPergamino);
+
+    // Tabla: hoy, mes y cosecha, cada tipo por separado.
+    double y = 450;
+    const double col[] = {izq, 240, 335, 425, 520, 610, 705, der};
+    l.texto(izq, y, der - izq, "Libras y quintales por tipo de café", 12, true, CAFE);
+    y += 28;
+    l.rectangulo(izq, y, der - izq, 26, CAFE);
+    const std::string periodos[] = {"Hoy", "Este mes", "Cosecha (desde " + desdeCosecha.texto() + ")"};
+    for (int p = 0; p < 3; ++p)
+        l.texto(col[1 + 2 * p], y + 5, col[3 + 2 * p] - col[1 + 2 * p], periodos[p], 9.5, true, BLANCO, ALINEAR_CENTRO);
+    y += 26;
+    l.rectangulo(izq, y, der - izq, 22, CREMA);
+    l.texto(col[0] + 8, y + 4, col[1] - col[0], "Tipo de café", 9.5, true, NEGRO);
+    for (int p = 0; p < 3; ++p) {
+        l.texto(col[1 + 2 * p], y + 4, col[2 + 2 * p] - col[1 + 2 * p] - 6, "Libras", 9.5, true, NEGRO, ALINEAR_DERECHA);
+        l.texto(col[2 + 2 * p], y + 4, col[3 + 2 * p] - col[2 + 2 * p] - 6, "Quintales", 9.5, true, NEGRO, ALINEAR_DERECHA);
+    }
+    y += 22;
+    const ResumenDia* datos[] = {&hoy, &mes, &cosecha};
+    struct Fila {
+        const char* nombre;
+        int tipo;  // 0 = total pergamino
+        bool negrita;
+    };
+    const Fila filas[] = {{"Uva", CAFE_UVA, true}, {"Pergamino húmedo", CAFE_HUMEDO, false},
+                          {"Pergamino seco", CAFE_SECO, false}, {"Total pergamino", 0, true}};
+    const double inicioTabla = y - 48;
+    for (const auto& f : filas) {
+        l.texto(col[0] + 8, y + 6, col[1] - col[0], f.nombre, 10.5, f.negrita, f.tipo == CAFE_UVA ? UVA : NEGRO);
+        for (int p = 0; p < 3; ++p) {
+            const double lb = f.tipo ? datos[p]->libras[f.tipo] : datos[p]->librasPergamino();
+            l.texto(col[1 + 2 * p], y + 6, col[2 + 2 * p] - col[1 + 2 * p] - 6, formatoDecimal(lb, 2), 10.5, f.negrita,
+                    NEGRO, ALINEAR_DERECHA);
+            l.texto(col[2 + 2 * p], y + 6, col[3 + 2 * p] - col[2 + 2 * p] - 6, formatoDecimal(aQuintales(lb), 2), 10.5,
+                    f.negrita, NEGRO, ALINEAR_DERECHA);
+        }
+        y += 30;
+        l.linea(izq, y, der, y, GRIS_CLARO);
+    }
+    l.rectangulo(izq, inicioTabla, der - izq, y - inicioTabla, SIN_COLOR, GRIS, 1.2);
+    for (int i = 1; i < 7; i += 2) l.linea(col[i], inicioTabla, col[i], y, GRIS);
+    y += 20;
+    l.texto(izq, y, der - izq,
+            "Facturas del mes: " + std::to_string(mes.comprobantesUva) + " de uva y " +
+                std::to_string(mes.comprobantesPergamino) + " de pergamino.   Cosecha: " +
+                std::to_string(cosecha.comprobantesUva) + " de uva y " + std::to_string(cosecha.comprobantesPergamino) +
+                " de pergamino.",
+            10, false, GRIS);
+    l.texto(izq, y + 22, der - izq, "No incluye facturas anuladas. 1 quintal = 100 libras.", 9, false, GRIS);
+    l.linea(70, 960, 330, 960, NEGRO);
+    l.texto(70, 966, 260, "Revisado por", 10, false, NEGRO, ALINEAR_CENTRO);
     return l;
 }
 

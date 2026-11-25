@@ -77,7 +77,7 @@ public:
     std::vector<PreciosDia> historialPrecios(const Fecha& desde, const Fecha& hasta);
 
     // ------------------------------------------------ Compras (comprobantes)
-    long siguienteNumeroFactura();
+    long siguienteNumeroFactura(int categoria);
     long registrarFactura(Factura& f);
     std::optional<Factura> facturaPorId(long id);
     std::vector<Factura> facturas(const Fecha& desde, const Fecha& hasta);

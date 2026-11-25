@@ -46,6 +46,10 @@ struct Lienzo {
 
 Lienzo lienzoComprobante(const Empresa& e, const Factura& f, const Cliente& c, int marcaAgua);
 
+// Informe del día: libras y quintales de uva y pergamino (hoy, el mes y la cosecha).
+Lienzo lienzoInformeDia(const Empresa& e, const Fecha& dia, const ResumenDia& hoy, const ResumenDia& mes,
+                        const ResumenDia& cosecha, const Fecha& desdeCosecha);
+
 // Para revisar el dibujo fuera de Windows.
 std::string lienzoJson(const Lienzo& l);
 

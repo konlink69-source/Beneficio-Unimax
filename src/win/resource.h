@@ -44,6 +44,7 @@
 #define IDM_CAMBIAR_CLAVE 40008
 #define IDM_USUARIOS 40009
 #define IDM_CERRAR_SESION 40010
+#define IDM_INFORME 40011
 
 // ---------------------------------------------------------------- Plantillas de Excel incluidas en el .exe
 #define IDR_PLT_FACTURA 300
@@ -92,6 +93,7 @@
 #define IDC_F_LBL_DNI 1030
 #define IDC_F_LBL_NOMBRE 1031
 #define IDC_F_LBL_TEL 1032
+#define IDC_F_INFORME 1033
 
 // ---------------------------------------------------------------- Historial
 #define IDC_H_DESDE 1101
@@ -123,6 +125,9 @@
 #define IDC_C_LISTA 1211
 #define IDC_C_RESUMEN 1212
 #define IDC_C_MODO 1213
+#define IDC_C_RTN 1214
+#define IDC_C_CARNET 1215
+#define IDC_C_BUSCAR_LBL 1216
 
 // ---------------------------------------------------------------- Precios
 #define IDC_P_FECHA 1301
@@ -207,6 +212,8 @@
 #define IDC_R_CIERRE 1711
 #define IDC_R_MESANT 1712
 #define IDC_R_INFO 1713
+#define IDC_R_INFORME 1714
+#define IDC_R_GENERAL 1715
 
 // ---------------------------------------------------------------- Configuración
 #define IDC_G_EMPRESA 1801
@@ -235,6 +242,7 @@
 #define IDC_G_USUARIOS 1824
 #define IDC_G_CLAVE 1825
 #define IDC_G_PROBAR_IMP 1826
+#define IDC_G_MINIMO 1827
 
 // ---------------------------------------------------------------- Diálogos
 #define IDC_S_BUSCAR 2001

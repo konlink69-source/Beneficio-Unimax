@@ -3,6 +3,7 @@
 #include "win/App.h"
 #include "win/Dialogos.h"
 #include "win/Excel.h"
+#include "win/Impresion.h"
 #include "win/Paginas.h"
 #include "win/resource.h"
 
@@ -66,6 +67,12 @@ public:
                 break;
             case IDC_R_ESTADO:
                 if (const auto c = seleccionarCliente(h_)) generarEstadoCuenta(h_, c->id);
+                return true;
+            case IDC_R_INFORME:
+                verInformeDia(h_, hasta);
+                return true;
+            case IDC_R_GENERAL:
+                generarReporteGeneral(h_, hasta);
                 return true;
             case IDC_R_CARPETA:
                 abrirCarpeta(App::instancia().rutas().documentos);

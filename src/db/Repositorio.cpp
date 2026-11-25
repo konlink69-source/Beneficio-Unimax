@@ -40,7 +40,7 @@ Deuda leerDeuda(const Sentencia& s) {
 const char* const SELECT_FACTURA =
     "SELECT f.Id, f.Numero, f.Fecha, f.HoraRegistro, f.ClienteId, c.Nombre, c.DNI, f.Total, f.Pagado, "
     "f.Saldo, f.Observaciones, f.Anulada, "
-    "(SELECT SUM(x.Libras) FROM FacturaDetalle AS x WHERE x.FacturaId = f.Id), f.Usuario "
+    "(SELECT SUM(x.Libras) FROM FacturaDetalle AS x WHERE x.FacturaId = f.Id), f.Usuario, f.Categoria "
     "FROM Facturas AS f INNER JOIN Clientes AS c ON f.ClienteId = c.Id";
 
 Factura leerFactura(const Sentencia& s) {
@@ -59,6 +59,7 @@ Factura leerFactura(const Sentencia& s) {
     f.anulada = s.entero(12) != 0;
     f.totalLibras = s.decimal(13);
     f.usuario = s.texto(14);
+    f.categoria = s.entero(15) == CATEGORIA_UVA ? CATEGORIA_UVA : CATEGORIA_PERGAMINO;
     return f;
 }
 
@@ -152,7 +153,7 @@ long Repositorio::ultimoId() {
 
 // ================================================================ Clientes
 std::vector<Cliente> Repositorio::clientes(bool incluirInactivos) {
-    std::string sql = "SELECT Id, Nombre, DNI, Telefono, Direccion, Tipo, Activo FROM Clientes";
+    std::string sql = "SELECT Id, Nombre, DNI, Telefono, Direccion, Tipo, Activo, RTN, Carnet FROM Clientes";
     if (!incluirInactivos) sql += " WHERE Activo = 1";
     sql += " ORDER BY Nombre";
     auto s = c_.preparar(sql);
@@ -167,13 +168,15 @@ std::vector<Cliente> Repositorio::clientes(bool incluirInactivos) {
         c.direccion = s.texto(5);
         c.tipo = static_cast<int>(s.entero(6));
         c.activo = s.entero(7) != 0;
+        c.rtn = s.texto(8);
+        c.carnet = s.texto(9);
         r.push_back(c);
     }
     return r;
 }
 
 std::optional<Cliente> Repositorio::clientePorId(long id) {
-    auto s = c_.preparar("SELECT Id, Nombre, DNI, Telefono, Direccion, Tipo, Activo FROM Clientes WHERE Id = ?");
+    auto s = c_.preparar("SELECT Id, Nombre, DNI, Telefono, Direccion, Tipo, Activo, RTN, Carnet FROM Clientes WHERE Id = ?");
     s.pEntero(id).ejecutar();
     if (!s.siguiente()) return std::nullopt;
     Cliente c;
@@ -184,6 +187,8 @@ std::optional<Cliente> Repositorio::clientePorId(long id) {
     c.direccion = s.texto(5);
     c.tipo = static_cast<int>(s.entero(6));
     c.activo = s.entero(7) != 0;
+        c.rtn = s.texto(8);
+        c.carnet = s.texto(9);
     return c;
 }
 
@@ -205,6 +210,14 @@ long Repositorio::guardarCliente(Cliente& c) {
     if (!v.valido) throw ErrorNegocio(v.error);
     c.dni = v.formateado;
     if (c.tipo < CLIENTE_PRODUCTOR || c.tipo > CLIENTE_AMBOS) c.tipo = CLIENTE_PRODUCTOR;
+    c.rtn = recortar(c.rtn);
+    if (!c.rtn.empty()) {
+        if (soloDigitos(c.rtn).size() != 14)
+            throw ErrorNegocio("El RTN debe tener 14 dígitos (o déjelo vacío si el cliente no tiene).");
+        c.rtn = validarIdentificacion(c.rtn, anioActual()).formateado;
+    }
+    c.carnet = recortar(c.carnet);
+    if (c.carnet.size() > 30) throw ErrorNegocio("El carnet IHCAFE es demasiado largo.");
 
     auto dup = c_.preparar("SELECT Id, Nombre FROM Clientes WHERE DNI = ? AND Id <> ?");
     dup.pTexto(c.dni).pEntero(c.id).ejecutar();
@@ -213,8 +226,8 @@ long Repositorio::guardarCliente(Cliente& c) {
 
     if (c.id == 0) {
         c_.preparar(
-              "INSERT INTO Clientes (Nombre, DNI, Telefono, Direccion, Tipo, Activo, FechaRegistro) "
-              "VALUES (?, ?, ?, ?, ?, ?, ?)")
+              "INSERT INTO Clientes (Nombre, DNI, Telefono, Direccion, Tipo, Activo, FechaRegistro, RTN, Carnet) "
+              "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
             .pTexto(c.nombre)
             .pTexto(c.dni)
             .pTexto(c.telefono)
@@ -222,16 +235,21 @@ long Repositorio::guardarCliente(Cliente& c) {
             .pEntero(c.tipo)
             .pEntero(c.activo ? 1 : 0)
             .pFecha(Fecha::hoy())
+            .pTexto(c.rtn)
+            .pTexto(c.carnet)
             .ejecutar();
         c.id = ultimoId();
     } else {
-        c_.preparar("UPDATE Clientes SET Nombre = ?, DNI = ?, Telefono = ?, Direccion = ?, Tipo = ?, Activo = ? WHERE Id = ?")
+        c_.preparar("UPDATE Clientes SET Nombre = ?, DNI = ?, Telefono = ?, Direccion = ?, Tipo = ?, Activo = ?, RTN = ?, "
+                    "Carnet = ? WHERE Id = ?")
             .pTexto(c.nombre)
             .pTexto(c.dni)
             .pTexto(c.telefono)
             .pTexto(c.direccion)
             .pEntero(c.tipo)
             .pEntero(c.activo ? 1 : 0)
+            .pTexto(c.rtn)
+            .pTexto(c.carnet)
             .pEntero(c.id)
             .ejecutar();
     }
@@ -340,9 +358,9 @@ std::vector<PreciosDia> Repositorio::historialPrecios(const Fecha& desde, const 
 }
 
 // ================================================================ Compras
-long Repositorio::siguienteNumeroFactura() {
-    auto s = c_.preparar("SELECT MAX(Numero) FROM Facturas");
-    s.ejecutar();
+long Repositorio::siguienteNumeroFactura(int categoria) {
+    auto s = c_.preparar("SELECT MAX(Numero) FROM Facturas WHERE Categoria = ?");
+    s.pEntero(categoria == CATEGORIA_UVA ? CATEGORIA_UVA : CATEGORIA_PERGAMINO).ejecutar();
     long n = 0;
     if (s.siguiente()) n = s.entero(1);
     return std::max(n + 1, configEntero("NumeroInicialFactura", 1));
@@ -360,7 +378,7 @@ long Repositorio::registrarFactura(Factura& f) {
     if (f.pagado > 0) exigirCajaAbierta(f.fecha, "registrar un comprobante con pago en efectivo");
 
     db::Transaccion tx(c_);
-    f.numero = siguienteNumeroFactura();
+    f.numero = siguienteNumeroFactura(f.categoria);
     f.hora = horaActual();
     f.clienteNombre = cliente->nombre;
     f.clienteDni = cliente->dni;
@@ -368,7 +386,7 @@ long Repositorio::registrarFactura(Factura& f) {
     f.observaciones = recortar(f.observaciones);
     c_.preparar(
           "INSERT INTO Facturas (Numero, Fecha, HoraRegistro, ClienteId, Total, Pagado, Saldo, Observaciones, Anulada, "
-          "Usuario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)")
+          "Usuario, Categoria) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)")
         .pEntero(f.numero)
         .pFecha(f.fecha)
         .pTexto(f.hora)
@@ -378,6 +396,7 @@ long Repositorio::registrarFactura(Factura& f) {
         .pDinero(f.saldo)
         .pTexto(f.observaciones)
         .pTexto(usuario_)
+        .pEntero(f.categoria)
         .ejecutar();
     f.id = ultimoId();
     f.usuario = usuario_;
@@ -393,7 +412,7 @@ long Repositorio::registrarFactura(Factura& f) {
             .pDinero(l.subtotal)
             .ejecutar();
     }
-    const std::string ref = "Comprobante #" + std::to_string(f.numero);
+    const std::string ref = "Comprobante " + f.numeroTexto();
     if (f.saldo > 0) {
         Deuda d;
         d.clienteId = f.clienteId;
@@ -404,7 +423,7 @@ long Repositorio::registrarFactura(Factura& f) {
         d.vencimiento = f.vencimientoSaldo;
         d.monto = f.saldo;
         d.saldo = f.saldo;
-        d.concepto = "Saldo pendiente del comprobante de compra #" + std::to_string(f.numero);
+        d.concepto = "Saldo pendiente del comprobante de compra " + f.numeroTexto();
         insertarDeuda(d);
     }
     if (f.pagado > 0)
@@ -444,7 +463,8 @@ std::vector<Factura> Repositorio::facturas(const Fecha& desde, const Fecha& hast
 
 std::vector<FilaCompra> Repositorio::detalleCompras(const Fecha& desde, const Fecha& hasta) {
     auto s = c_.preparar(
-        "SELECT f.Numero, f.Fecha, c.Nombre, c.DNI, d.TipoCafeId, d.Libras, d.Galones, d.PrecioLibra, d.Subtotal "
+        "SELECT f.Numero, f.Fecha, c.Nombre, c.DNI, d.TipoCafeId, d.Libras, d.Galones, d.PrecioLibra, d.Subtotal, "
+        "f.Categoria "
         "FROM (Facturas AS f INNER JOIN Clientes AS c ON f.ClienteId = c.Id) "
         "INNER JOIN FacturaDetalle AS d ON d.FacturaId = f.Id "
         "WHERE f.Anulada = 0 AND f.Fecha >= ? AND f.Fecha <= ? ORDER BY f.Numero, d.Id");
@@ -461,6 +481,7 @@ std::vector<FilaCompra> Repositorio::detalleCompras(const Fecha& desde, const Fe
         fc.linea.galones = s.decimal(7);
         fc.linea.precioLibra = s.decimal(8);
         fc.linea.subtotal = s.dinero(9);
+        fc.categoria = s.entero(10) == CATEGORIA_UVA ? CATEGORIA_UVA : CATEGORIA_PERGAMINO;
         r.push_back(fc);
     }
     return r;
@@ -469,7 +490,7 @@ std::vector<FilaCompra> Repositorio::detalleCompras(const Fecha& desde, const Fe
 void Repositorio::anularFactura(long id, const std::string& motivo, const Fecha& hoy) {
     const auto f = facturaPorId(id);
     if (!f) throw ErrorNegocio("El comprobante no existe.");
-    if (f->anulada) throw ErrorNegocio("El comprobante #" + std::to_string(f->numero) + " ya está anulado.");
+    if (f->anulada) throw ErrorNegocio("El comprobante " + f->numeroTexto() + " ya está anulado.");
     if (recortar(motivo).empty()) throw ErrorNegocio("Escriba el motivo de la anulación.");
     const auto d = deudaDeComprobante("FacturaId", id);
     if (d && !d->anulada && abonosActivos(d->id) > 0)
@@ -485,10 +506,10 @@ void Repositorio::anularFactura(long id, const std::string& motivo, const Fecha&
         .pEntero(id)
         .ejecutar();
     if (d && !d->anulada) c_.preparar("UPDATE Deudas SET Anulada = 1 WHERE Id = ?").pEntero(d->id).ejecutar();
-    const std::string ref = "Comprobante #" + std::to_string(f->numero);
+    const std::string ref = "Comprobante " + f->numeroTexto();
     if (f->pagado > 0)
         insertarMovimiento(hoy, TipoMovimiento::Ingreso, "ANULACION",
-                           "Anulación del comprobante #" + std::to_string(f->numero) + " (devolución del pago)", ref,
+                           "Anulación del comprobante " + f->numeroTexto() + " (devolución del pago)", ref,
                            f->pagado);
     tx.confirmar();
 }

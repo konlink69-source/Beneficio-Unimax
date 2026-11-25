@@ -118,6 +118,7 @@ private:
         }
         comboSeleccionar(h_, IDC_G_IMPRESORA, seleccion);
         ponerTexto(h_, IDC_G_COPIAS, std::to_string(r.configEntero("CopiasComprobante", 1)));
+        ponerTexto(h_, IDC_G_MINIMO, formatoMonto(App::instancia().minimoCaja()));
         CheckDlgButton(h_, IDC_G_PDF_COMP, r.config("GuardarPdfComprobante", "1") == "1" ? BST_CHECKED : BST_UNCHECKED);
         comboSeleccionar(h_, IDC_G_MARCA, App::instancia().marcaAgua());
 
@@ -139,6 +140,8 @@ private:
         if (!horaValida(hora)) return mostrarAviso(h_, "La hora del aviso debe tener el formato HH:MM (por ejemplo 07:30).");
         const auto copias = parsearDecimal(texto(h_, IDC_G_COPIAS));
         if (!copias || *copias < 1 || *copias > 5) return mostrarAviso(h_, "Las copias del comprobante deben ser de 1 a 5.");
+        const auto minimo = leerMonto(h_, IDC_G_MINIMO);
+        if (!minimo || *minimo < 0) return mostrarAviso(h_, "El monto mínimo de caja no es válido.");
         if (!autorizar(h_, "cambiar la configuración")) return;
         Repositorio& r = repo();
         const int marcaAnterior = App::instancia().marcaAgua();
@@ -160,6 +163,7 @@ private:
             r.setConfig("CopiasComprobante", std::to_string(static_cast<long>(*copias)));
             r.setConfig("GuardarPdfComprobante", IsDlgButtonChecked(h_, IDC_G_PDF_COMP) == BST_CHECKED ? "1" : "0");
             r.setConfig("MarcaAgua", std::to_string(marca));
+            r.setConfig("MinimoCaja", formatoMonto(*minimo));
             if (marca != marcaAnterior) App::instancia().refrescarMarcaAgua();
             if (hora != horaAnterior && avisoWindowsActivo()) {
                 std::string error;

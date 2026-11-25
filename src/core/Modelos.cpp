@@ -2,6 +2,9 @@
 
 #include "core/Texto.h"
 
+#include <algorithm>
+#include <cstdio>
+
 namespace bu {
 
 const char* nombreTipoCafe(int tipo) {
@@ -12,6 +15,58 @@ const char* nombreTipoCafe(int tipo) {
         default: return "?";
     }
 }
+
+int categoriaDe(int tipoCafe) { return tipoCafe == CAFE_UVA ? CATEGORIA_UVA : CATEGORIA_PERGAMINO; }
+
+const char* nombreCategoria(int categoria) { return categoria == CATEGORIA_UVA ? "UVA" : "PERGAMINO"; }
+
+std::string numeroFactura(int categoria, long numero) {
+    char buf[24];
+    std::snprintf(buf, sizeof buf, "%c-%06ld", categoria == CATEGORIA_UVA ? 'U' : 'P', numero);
+    return buf;
+}
+
+std::vector<ResumenDia> resumirPorDia(const std::vector<FilaCompra>& filas) {
+    std::vector<ResumenDia> r;
+    std::vector<std::pair<int, long>> contados;  // comprobantes ya contados en el día
+    for (const auto& f : filas) {
+        auto it = std::find_if(r.begin(), r.end(), [&](const ResumenDia& d) { return d.fecha == f.fecha; });
+        if (it == r.end()) {
+            r.emplace_back();
+            r.back().fecha = f.fecha;
+            it = r.end() - 1;
+            contados.clear();
+        }
+        const int t = f.linea.tipoCafe;
+        if (t >= 1 && t <= NUM_TIPOS_CAFE) {
+            it->libras[t] += f.linea.libras;
+            it->monto[t] += f.linea.subtotal;
+        }
+        const std::pair<int, long> clave{f.categoria, f.numero};
+        if (std::find(contados.begin(), contados.end(), clave) == contados.end()) {
+            contados.push_back(clave);
+            if (f.categoria == CATEGORIA_UVA) ++it->comprobantesUva;
+            else ++it->comprobantesPergamino;
+        }
+    }
+    std::sort(r.begin(), r.end(), [](const ResumenDia& a, const ResumenDia& b) { return a.fecha < b.fecha; });
+    return r;
+}
+
+ResumenDia sumarResumenes(const std::vector<ResumenDia>& dias) {
+    ResumenDia t;
+    for (const auto& d : dias) {
+        for (int i = 1; i <= NUM_TIPOS_CAFE; ++i) {
+            t.libras[i] += d.libras[i];
+            t.monto[i] += d.monto[i];
+        }
+        t.comprobantesUva += d.comprobantesUva;
+        t.comprobantesPergamino += d.comprobantesPergamino;
+    }
+    return t;
+}
+
+Fecha inicioCosecha(const Fecha& f) { return Fecha(f.mes >= 10 ? f.anio : f.anio - 1, 10, 1); }
 
 const char* nombreTipoCliente(int tipo) {
     switch (tipo) {
@@ -25,6 +80,7 @@ const char* nombreTipoCliente(int tipo) {
 void recalcularFactura(Factura& f) {
     f.total = 0;
     f.totalLibras = 0;
+    if (!f.lineas.empty()) f.categoria = categoriaDe(f.lineas.front().tipoCafe);
     for (auto& l : f.lineas) {
         l.libras = redondear(l.libras, 2);
         l.galones = redondear(l.galones, 2);
@@ -47,6 +103,9 @@ std::string validarFactura(const Factura& f) {
         if (l.libras <= 0) return "Hay una línea sin peso (las libras deben ser mayores que cero).";
         if (l.galones < 0) return "Los galones no pueden ser negativos.";
         if (l.precioLibra <= 0) return "Hay una línea sin precio por libra.";
+        if (categoriaDe(l.tipoCafe) != categoriaDe(f.lineas.front().tipoCafe))
+            return "Las facturas de uva y de pergamino van aparte. Guarde una factura solo con uva y otra solo con "
+                   "pergamino (húmedo y seco pueden ir juntos).";
     }
     if (f.total <= 0) return "El total del comprobante debe ser mayor que cero.";
     if (f.pagado < 0) return "El monto pagado no puede ser negativo.";

@@ -614,7 +614,9 @@ std::optional<Cliente> seleccionarCliente(HWND padre, const std::string& filtroI
 
 bool dialogoNuevaDeuda(HWND padre) {
     DlgNuevaDeuda d;
-    return d.mostrar(padre, IDD_NUEVA_DEUDA) == IDOK;
+    const bool ok = d.mostrar(padre, IDD_NUEVA_DEUDA) == IDOK;
+    if (ok) App::instancia().avisarCajaBaja(padre);
+    return ok;
 }
 
 void dialogoDetalleDeuda(HWND padre, long deudaId) {
@@ -624,12 +626,16 @@ void dialogoDetalleDeuda(HWND padre, long deudaId) {
 
 bool dialogoAbono(HWND padre, long deudaId) {
     DlgAbono d(deudaId);
-    return d.mostrar(padre, IDD_ABONO) == IDOK;
+    const bool ok = d.mostrar(padre, IDD_ABONO) == IDOK;
+    if (ok) App::instancia().avisarCajaBaja(padre);
+    return ok;
 }
 
 bool dialogoMovimiento(HWND padre, const Fecha& fecha) {
     DlgMovimiento d(fecha);
-    return d.mostrar(padre, IDD_MOVIMIENTO) == IDOK;
+    const bool ok = d.mostrar(padre, IDD_MOVIMIENTO) == IDOK;
+    if (ok) App::instancia().avisarCajaBaja(padre);
+    return ok;
 }
 
 std::optional<std::string> pedirTexto(HWND padre, const std::string& titulo, const std::string& pregunta,

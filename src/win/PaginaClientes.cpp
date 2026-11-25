@@ -23,12 +23,20 @@ public:
         SendDlgItemMessageW(h_, IDC_C_DNI, EM_LIMITTEXT, 20, 0);
         SendDlgItemMessageW(h_, IDC_C_TELEFONO, EM_LIMITTEXT, 30, 0);
         SendDlgItemMessageW(h_, IDC_C_DIRECCION, EM_LIMITTEXT, 255, 0);
+        SendDlgItemMessageW(h_, IDC_C_CARNET, EM_LIMITTEXT, 30, 0);
+        // Barra de búsqueda grande y visible.
+        ponerFuente(h_, IDC_C_BUSCAR_LBL, fuenteEtiqueta());
+        colorTexto(IDC_C_BUSCAR_LBL, COLOR_CAFE);
+        ponerFuente(h_, IDC_C_BUSCAR, fuente(tamanoLetra() * 12.0 / 9.0, false));
+        textoGuia(h_, IDC_C_BUSCAR, L"Escriba nombre, apellido, DNI, RTN o carnet");
         lvConfigurar(h_, IDC_C_LISTA,
                      {{L"Nombre", 140},
                       {L"DNI / RTN", 76},
                       {L"Teléfono", 56},
                       {L"Dirección", 110},
                       {L"Tipo", 70},
+                      {L"RTN", 76},
+                      {L"Carnet IHCAFE", 60},
                       {L"El beneficio le debe", 74, true},
                       {L"Le debe al beneficio", 74, true}});
         ponerFuente(h_, IDC_C_MODO, fuenteNegrita());
@@ -98,11 +106,13 @@ private:
         const std::string filtro = texto(h_, IDC_C_BUSCAR);
         int n = 0;
         for (const auto& c : todos_) {
-            if (!coincideBusqueda(c.nombre + " " + c.dni + " " + c.telefono + " " + c.direccion, filtro)) continue;
+            if (!coincideBusqueda(c.nombre + " " + c.dni + " " + c.telefono + " " + c.direccion + " " + c.rtn + " " + c.carnet,
+                                  filtro))
+                continue;
             const auto it = deudas_.find(c.id);
             const ResumenDeudas rd = it == deudas_.end() ? ResumenDeudas() : it->second;
             lvAgregar(h_, IDC_C_LISTA,
-                      {c.nombre, c.dni, c.telefono, c.direccion, nombreTipoCliente(c.tipo),
+                      {c.nombre, c.dni, c.telefono, c.direccion, nombreTipoCliente(c.tipo), c.rtn, c.carnet,
                        rd.porPagar ? formatoLempiras(rd.porPagar) : std::string(),
                        rd.porCobrar ? formatoLempiras(rd.porCobrar) : std::string()},
                       c.id);
@@ -113,7 +123,7 @@ private:
 
     void nuevo() {
         editId_ = 0;
-        for (int id : {IDC_C_NOMBRE, IDC_C_DNI, IDC_C_TELEFONO, IDC_C_DIRECCION}) ponerTexto(h_, id, "");
+        for (int id : {IDC_C_NOMBRE, IDC_C_DNI, IDC_C_TELEFONO, IDC_C_DIRECCION, IDC_C_RTN, IDC_C_CARNET}) ponerTexto(h_, id, "");
         comboSeleccionar(h_, IDC_C_TIPO, CLIENTE_PRODUCTOR);
         ponerTexto(h_, IDC_C_MODO, "Nuevo cliente: llene los datos y presione Guardar.");
         habilitar(h_, IDC_C_ELIMINAR, false);
@@ -128,6 +138,8 @@ private:
             ponerTexto(h_, IDC_C_DNI, c.dni);
             ponerTexto(h_, IDC_C_TELEFONO, c.telefono);
             ponerTexto(h_, IDC_C_DIRECCION, c.direccion);
+            ponerTexto(h_, IDC_C_RTN, c.rtn);
+            ponerTexto(h_, IDC_C_CARNET, c.carnet);
             comboSeleccionar(h_, IDC_C_TIPO, c.tipo);
             ponerTexto(h_, IDC_C_MODO, "Editando: " + c.nombre);
             habilitar(h_, IDC_C_ELIMINAR, true);
@@ -142,6 +154,8 @@ private:
         c.dni = texto(h_, IDC_C_DNI);
         c.telefono = texto(h_, IDC_C_TELEFONO);
         c.direccion = texto(h_, IDC_C_DIRECCION);
+        c.rtn = texto(h_, IDC_C_RTN);
+        c.carnet = texto(h_, IDC_C_CARNET);
         c.tipo = static_cast<int>(comboDato(h_, IDC_C_TIPO, CLIENTE_PRODUCTOR));
         c.activo = true;
         // Cambiar los datos de un cliente ya registrado es un dato delicado.

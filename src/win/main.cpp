@@ -14,6 +14,7 @@
 #include <memory>
 
 #include "win/Avisos.h"
+#include "win/Impresion.h"
 #include "win/Instalacion.h"
 #include "win/Paginas.h"
 #include "win/Sesion.h"
@@ -138,6 +139,15 @@ void pintarEncabezado(HWND h, HDC dc) {
     const Usuario& u = App::instancia().usuario();
     if (u.id) linea = "Usuario: " + (u.nombre.empty() ? u.usuario : u.nombre) + " (" + nombreRol(u.rol) + ")    ·    " + linea;
     DrawTextW(dc, W(linea).c_str(), -1, &rf, DT_RIGHT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS);
+    if (App::instancia().cajaBaja()) {
+        // Alerta siempre visible mientras la caja esté bajo el mínimo.
+        RECT ra{rf.left, rf.top + escala(static_cast<int>(tamanoLetra() * 2.1)), rf.right, alto - viga};
+        SelectObject(dc, fuente(tamanoLetra() * 1.15, true));
+        SetTextColor(dc, COLOR_ROJO);
+        DrawTextW(dc, W("¡Caja baja! Quedan " + formatoLempiras(App::instancia().saldoCaja()) + " (mínimo " +
+                         formatoLempiras(App::instancia().minimoCaja()) + ")").c_str(),
+                  -1, &ra, DT_RIGHT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS);
+    }
     SelectObject(dc, fuenteAnterior);
 }
 
@@ -169,6 +179,7 @@ void mostrarPagina(int indice) {
     Pagina* p = g.paginas[static_cast<size_t>(indice)].get();
     SetWindowPos(p->hwnd(), HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     intentar(p->hwnd(), [&] { p->alMostrar(); });
+    App::instancia().actualizarCaja();
 }
 
 bool crearContenido(HWND h) {
@@ -300,6 +311,9 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     ShowWindow(h, SW_SHOWMAXIMIZED);
                     InvalidateRect(h, nullptr, TRUE);
                     if (g.actual >= 0) mostrarPagina(g.actual);
+                    return 0;
+                case IDM_INFORME:
+                    verInformeDia(h, Fecha::hoy());
                     return 0;
                 case IDM_RECORDATORIO:
                     App::instancia().mostrarRecordatorio(h, true);

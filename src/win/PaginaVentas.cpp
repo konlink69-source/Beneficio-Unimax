@@ -218,7 +218,10 @@ private:
             if (!autorizar(h_, "anular una venta")) return;
             const auto motivo = pedirTexto(h_, "Anular venta", "Escriba el motivo de la anulación:");
             if (!motivo) return;
-            if (intentar(h_, [&] { repo().anularVenta(id, *motivo, Fecha::hoy()); })) listar();
+            if (intentar(h_, [&] { repo().anularVenta(id, *motivo, Fecha::hoy()); })) {
+                listar();
+                App::instancia().avisarCajaBaja(h_);
+            }
             return;
         }
     }

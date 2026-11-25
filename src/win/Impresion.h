@@ -30,9 +30,19 @@ Lienzo lienzoDeFactura(long facturaId, Factura* factura = nullptr, Cliente* clie
 
 // Imprime el comprobante en la impresora configurada. Devuelve el nombre de la impresora o lanza error.
 std::wstring imprimirComprobante(long facturaId);
+// Ruta donde está (o estaría) el PDF de una factura.
+std::wstring rutaPdfComprobante(long facturaId);
 // Guarda el PDF en la carpeta del cliente (con "Microsoft Print to PDF"). Devuelve la ruta o lanza error.
 std::wstring guardarPdfComprobante(long facturaId);
 // Muestra el comprobante en una ventana del programa (con botones Imprimir, PDF, carpeta y Excel).
 void verComprobante(HWND padre, long facturaId);
+
+// ¿Es una "impresora" que guarda archivos (PDF, XPS, OneNote, fax) en vez de imprimir en papel?
+bool esImpresoraVirtual(const std::wstring& nombre);
+
+// Informe del día (uva y pergamino por separado: hoy, el mes y la cosecha), dentro del programa.
+void verInformeDia(HWND padre, const Fecha& dia);
+// Reporte general en Excel: una fila por día desde el inicio de la cosecha hasta "hasta".
+void generarReporteGeneral(HWND padre, const Fecha& hasta);
 
 }  // namespace bu::win

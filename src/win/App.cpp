@@ -206,8 +206,63 @@ HBITMAP App::marcaAguaParaLista(int marca) {
     return bmp;
 }
 
+HBITMAP App::logoTenue(int ancho, int alto) {
+    const ImagenDib img = imagenRecurso(IDB_LOGO_DOC);
+    if (!img.info || ancho <= 0 || alto <= 0) return nullptr;
+    const double factor = std::min(static_cast<double>(ancho) / img.ancho, static_cast<double>(alto) / img.alto);
+    const int w = std::max(1, static_cast<int>(img.ancho * factor)), h = std::max(1, static_cast<int>(img.alto * factor));
+    BITMAPINFO bi{};
+    bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
+    bi.bmiHeader.biWidth = w;
+    bi.bmiHeader.biHeight = h;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    void* bits = nullptr;
+    HDC pantalla = GetDC(nullptr);
+    HBITMAP bmp = CreateDIBSection(pantalla, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    HDC mem = CreateCompatibleDC(pantalla);
+    HGDIOBJ anterior = SelectObject(mem, bmp);
+    SetStretchBltMode(mem, HALFTONE);
+    SetBrushOrgEx(mem, 0, 0, nullptr);
+    StretchDIBits(mem, 0, 0, w, h, 0, 0, img.ancho, img.alto, img.bits, img.info, DIB_RGB_COLORS, SRCCOPY);
+    GdiFlush();
+    // Aclarar: cada color queda al 12 % de su intensidad sobre blanco.
+    auto* p = static_cast<BYTE*>(bits);
+    for (int i = 0; i < w * h * 4; ++i)
+        if (i % 4 != 3) p[i] = static_cast<BYTE>(255 - (255 - p[i]) * 12 / 100);
+    SelectObject(mem, anterior);
+    DeleteDC(mem);
+    ReleaseDC(nullptr, pantalla);
+    return bmp;
+}
+
 std::wstring App::rutaMarcaAguaPng(int marca) const {
     return rutas_.plantillas + (marca == MARCA_SELLO ? L"\\marca_agua_2.png" : L"\\marca_agua_1.png");
+}
+
+Centavos App::minimoCaja() {
+    try {
+        return parsearMonto(repo().config("MinimoCaja", "5,000.00")).value_or(500000);
+    } catch (...) {
+        return 500000;
+    }
+}
+
+bool App::actualizarCaja() {
+    try {
+        saldoCaja_ = repo().resumenCaja(Fecha::hoy()).esperado;
+        cajaBaja_ = saldoCaja_ < minimoCaja();
+    } catch (...) {
+        cajaBaja_ = false;
+    }
+    if (ventana) InvalidateRect(ventana, nullptr, FALSE);
+    return cajaBaja_;
+}
+
+void App::avisarCajaBaja(HWND padre) {
+    if (actualizarCaja())
+        mostrarAviso(padre, "¡Atención! En caja quedan " + formatoLempiras(saldoCaja_) + ", menos del mínimo de " +
+                                formatoLempiras(minimoCaja()) + ".\n\nConsidere reponer efectivo antes de seguir pagando.");
 }
 
 void App::refrescarMarcaAgua() {

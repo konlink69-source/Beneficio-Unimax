@@ -5,6 +5,7 @@
 
 #include <map>
 #include <memory>
+#include <vector>
 
 namespace bu::win {
 
@@ -47,6 +48,20 @@ protected:
     void estirar(int id, int ancho, int alto, bool horizontal, bool vertical);
 
 private:
+    // Escalado proporcional: los controles crecen o se achican con la ventana.
+    struct Original {
+        HWND control;
+        RECT rect;
+        LOGFONTW letra;
+        bool tieneLetra;
+        bool combo;
+    };
+    void guardarDiseno();
+    void escalar(int ancho, int alto);
+    std::vector<Original> originales_;
+    SIZE tamanoDiseno_{0, 0};
+    double escalaActual_ = 1.0;
+
     static INT_PTR CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp);
 };
 

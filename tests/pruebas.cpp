@@ -154,13 +154,43 @@ static void pruebasTextoYModelos() {
     f.clienteId = 1;
     f.fecha = Fecha(2026, 11, 21);
     f.lineas.push_back({CAFE_SECO, 125.5, 0, 45.75, 0});
-    f.lineas.push_back({CAFE_UVA, 300, 40, 8.0, 0});
+    f.lineas.push_back({CAFE_HUMEDO, 300, 40, 8.0, 0});
     f.pagado = 700000;
     recalcularFactura(f);
     CHECK_EQ(f.total, 574163LL + 240000LL);
     CHECK_EQ(f.saldo, 814163LL - 700000LL);
     CHECK_EQ(f.totalLibras, 425.5);
     CHECK(validarFactura(f).empty());
+    CHECK_EQ(f.categoria, static_cast<int>(CATEGORIA_PERGAMINO));
+    {
+        Factura mezcla = f;
+        mezcla.lineas.push_back({CAFE_UVA, 10, 0, 8.0, 0});
+        recalcularFactura(mezcla);
+        CHECK(!validarFactura(mezcla).empty());  // uva y pergamino van aparte
+    }
+    CHECK_EQ(numeroFactura(CATEGORIA_UVA, 5), std::string("U-000005"));
+    CHECK_EQ(inicioCosecha(Fecha(2026, 11, 25)).iso(), std::string("2026-10-01"));
+    CHECK_EQ(inicioCosecha(Fecha(2027, 3, 2)).iso(), std::string("2026-10-01"));
+    {
+        std::vector<FilaCompra> filas(3);
+        filas[0].fecha = filas[1].fecha = Fecha(2026, 11, 25);
+        filas[2].fecha = Fecha(2026, 11, 24);
+        filas[0].numero = 1;
+        filas[0].categoria = CATEGORIA_UVA;
+        filas[0].linea = {CAFE_UVA, 100, 0, 8, 0};
+        filas[1].numero = 1;
+        filas[1].categoria = CATEGORIA_PERGAMINO;
+        filas[1].linea = {CAFE_SECO, 50, 0, 46, 0};
+        filas[2].numero = 2;
+        filas[2].linea = {CAFE_HUMEDO, 30, 0, 30, 0};
+        const auto dias = resumirPorDia(filas);
+        CHECK_EQ(dias.size(), static_cast<size_t>(2));
+        CHECK(dias[0].fecha == Fecha(2026, 11, 24));
+        CHECK_EQ(dias[1].libras[CAFE_UVA], 100.0);
+        CHECK_EQ(dias[1].comprobantesUva, 1);
+        CHECK_EQ(dias[1].comprobantesPergamino, 1);
+        CHECK_EQ(sumarResumenes(dias).librasPergamino(), 80.0);
+    }
     f.pagado = f.total + 1;
     recalcularFactura(f);
     CHECK(!validarFactura(f).empty());
@@ -283,7 +313,13 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     juan.nombre = "  Juan Pérez ";
     juan.dni = "0801199012345";
     juan.telefono = "9999-0000";
+    juan.rtn = "123";
+    CHECK_ERROR_NEGOCIO(repo.guardarCliente(juan));  // RTN incompleto
+    juan.rtn = "08011990123456";
+    juan.carnet = " IH-12345 ";
     repo.guardarCliente(juan);
+    CHECK_EQ(repo.clientePorId(juan.id)->rtn, std::string("0801-1990-123456"));
+    CHECK_EQ(repo.clientePorId(juan.id)->carnet, std::string("IH-12345"));
     CHECK(juan.id > 0);
     CHECK_EQ(juan.dni, std::string("0801-1990-12345"));
     CHECK_EQ(juan.nombre, std::string("Juan Pérez"));
@@ -332,7 +368,7 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     f.clienteId = juan.id;
     f.fecha = hoy;
     f.lineas.push_back({CAFE_SECO, 125.5, 0, 46.0, 0});   // 5773.00
-    f.lineas.push_back({CAFE_UVA, 300, 40, 8.5, 0});       // 2550.00
+    f.lineas.push_back({CAFE_HUMEDO, 300, 40, 8.5, 0});    // 2550.00
     f.pagado = 500000;                                     // paga L 5,000.00
     f.vencimientoSaldo = hoy.sumarDias(2);
     f.observaciones = "Primera entrega";
@@ -350,7 +386,8 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     CHECK_EQ(fl->totalLibras, 425.5);
     CHECK_EQ(fl->clienteNombre, std::string("Juan Pérez"));
     CHECK(fl->vencimientoSaldo.has_value() && *fl->vencimientoSaldo == hoy.sumarDias(2));
-    CHECK_EQ(repo.siguienteNumeroFactura(), 101L);
+    CHECK_EQ(repo.siguienteNumeroFactura(CATEGORIA_PERGAMINO), 101L);
+    CHECK_EQ(repo.siguienteNumeroFactura(CATEGORIA_UVA), 100L);  // cada tipo con su numeración
 
     // La deuda del beneficio con Juan quedó registrada.
     auto rd = repo.resumenDeudas(juan.id);
@@ -504,7 +541,7 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     // --- Documentos a partir de datos reales
     const Empresa emp = repo.empresa();
     Documento doc = docComprobanteCompra(emp, *repo.facturaPorId(f.id), *repo.clientePorId(juan.id));
-    CHECK_EQ(doc.nombreArchivo, std::string("Comprobante_000100"));
+    CHECK_EQ(doc.nombreArchivo, std::string("Comprobante_P-000100"));
     bool letras = false, anulado = false;
     for (const auto& c : doc.celdas) {
         if (c.first == "TOTAL_LETRAS")
@@ -518,12 +555,24 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     const Lienzo lz = lienzoComprobante(emp, *repo.facturaPorId(f.id), *repo.clientePorId(juan.id), MARCA_DIAGONAL);
     bool hayNumero = false, hayAnulado = false, hayMarca = false;
     for (const auto& e : lz.elementos) {
-        if (e.texto == "000100") hayNumero = true;
+        if (e.texto == "P-000100") hayNumero = true;
         if (e.texto == "ANULADO") hayAnulado = true;
         if (e.imagen == "marca1") hayMarca = true;
         CHECK(e.x >= 0 && e.y >= 0 && e.x + e.ancho <= lz.ancho + 0.01 && e.y + e.alto <= lz.alto + 0.01);
     }
     CHECK(hayNumero && hayAnulado && hayMarca);
+    Factura fu;
+    fu.clienteId = juan.id;
+    fu.fecha = hoy;
+    fu.lineas.push_back({CAFE_UVA, 200, 30, 8.5, 0});
+    fu.pagado = 0;
+    repo.registrarFactura(fu);
+    CHECK_EQ(fu.numeroTexto(), std::string("U-000100"));
+    const auto diasCompra = resumirPorDia(repo.detalleCompras(hoy, hoy));
+    CHECK_EQ(diasCompra.size(), static_cast<size_t>(1));
+    CHECK_EQ(diasCompra[0].libras[CAFE_UVA], 200.0);
+    const Lienzo inf = lienzoInformeDia(emp, hoy, diasCompra[0], diasCompra[0], diasCompra[0], inicioCosecha(hoy));
+    CHECK(inf.elementos.size() > 20);
     Documento dc = docCierreCaja(emp, repo.resumenCaja(hoy), repo.movimientos(hoy));
     CHECK_EQ(dc.tablas[0].filas.size(), repo.movimientos(hoy).size());
     Documento dv = docReporteVentas(emp, hoy, hoy, repo.ventas(hoy, hoy));
@@ -574,8 +623,12 @@ int main(int argc, char** argv) {
         f.fecha = Fecha(2026, 11, 25);
         f.hora = "10:42:00";
         f.usuario = "admin";
-        f.lineas.push_back({CAFE_SECO, 125.5, 0, 46.0, 0});
-        f.lineas.push_back({CAFE_UVA, 300, 40, 8.5, 0});
+        if (argc > 3 && std::strcmp(argv[3], "uva") == 0) {
+            f.lineas.push_back({CAFE_UVA, 1250, 180, 8.5, 0});
+        } else {
+            f.lineas.push_back({CAFE_SECO, 125.5, 0, 46.0, 0});
+            f.lineas.push_back({CAFE_HUMEDO, 300, 40, 8.5, 0});
+        }
         f.pagado = 500000;
         f.vencimientoSaldo = Fecha(2026, 11, 30);
         f.observaciones = "Primera entrega de la cosecha";
@@ -585,6 +638,23 @@ int main(int argc, char** argv) {
         c.dni = "0801-1990-12345";
         c.telefono = "9999-0000";
         std::cout << lienzoJson(lienzoComprobante(e, f, c, std::atoi(argv[2])));
+        return 0;
+    }
+    if (argc > 1 && std::strcmp(argv[1], "--informe") == 0) {
+        Empresa e;
+        ResumenDia hoy, mes, cos;
+        hoy.libras[CAFE_UVA] = 3250;
+        hoy.libras[CAFE_HUMEDO] = 820;
+        hoy.libras[CAFE_SECO] = 1475.5;
+        hoy.comprobantesUva = 6;
+        hoy.comprobantesPergamino = 4;
+        mes = hoy;
+        cos = hoy;
+        for (int t = 1; t <= 3; ++t) {
+            mes.libras[t] *= 18;
+            cos.libras[t] *= 41;
+        }
+        std::cout << lienzoJson(lienzoInformeDia(e, Fecha(2026, 11, 25), hoy, mes, cos, Fecha(2026, 10, 1)));
         return 0;
     }
     if (argc > 1 && std::strcmp(argv[1], "--nombres") == 0) {

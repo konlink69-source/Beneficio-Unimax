@@ -3,6 +3,8 @@
 #include <winspool.h>
 
 #include <algorithm>
+#include <cwctype>
+#include <functional>
 #include <cmath>
 #include <cstdio>
 #include <cwchar>
@@ -28,11 +30,6 @@ int idImagen(const std::string& nombre) {
     return 0;
 }
 
-std::string numero6(long n) {
-    char buf[16];
-    std::snprintf(buf, sizeof buf, "%06ld", n);
-    return buf;
-}
 
 }  // namespace
 
@@ -134,13 +131,26 @@ std::wstring impresoraPredeterminada() {
     return r;
 }
 
+bool esImpresoraVirtual(const std::wstring& nombre) {
+    // Estas "impresoras" no imprimen en papel: piden guardar un archivo.
+    std::wstring n = nombre;
+    for (auto& ch : n) ch = static_cast<wchar_t>(towlower(ch));
+    for (const wchar_t* v : {L"pdf", L"xps", L"onenote", L"fax", L"enviar a", L"send to"})
+        if (n.find(v) != std::wstring::npos) return true;
+    return false;
+}
+
 std::wstring impresoraConfigurada() {
+    const auto lista = impresoras();
     const std::wstring elegida = W(repo().config("Impresora"));
-    if (!elegida.empty()) {
-        for (const auto& p : impresoras())
+    if (!elegida.empty() && !esImpresoraVirtual(elegida))
+        for (const auto& p : lista)
             if (p == elegida) return elegida;
-    }
-    return impresoraPredeterminada();
+    const std::wstring predeterminada = impresoraPredeterminada();
+    if (!predeterminada.empty() && !esImpresoraVirtual(predeterminada)) return predeterminada;
+    for (const auto& p : lista)
+        if (!esImpresoraVirtual(p)) return p;
+    return std::wstring();  // no hay impresora física
 }
 
 bool imprimirLienzo(const Lienzo& l, const std::wstring& impresora, int copias, const std::wstring& documento,
@@ -207,18 +217,30 @@ Lienzo lienzoDeFactura(long facturaId, Factura* factura, Cliente* cliente) {
     if (!c) throw ErrorNegocio("El cliente del comprobante no existe.");
     if (factura) *factura = *f;
     if (cliente) *cliente = *c;
-    return lienzoComprobante(repo().empresa(), *f, *c, App::instancia().marcaAgua());
+    // Las facturas llevan siempre el sello (opción 2) como marca de agua.
+    return lienzoComprobante(repo().empresa(), *f, *c, MARCA_SELLO);
 }
 
 std::wstring imprimirComprobante(long facturaId) {
     Factura f;
     const Lienzo l = lienzoDeFactura(facturaId, &f);
     const std::wstring impresora = impresoraConfigurada();
+    if (impresora.empty())
+        throw ErrorNegocio("No hay una impresora conectada. La factura " + f.numeroTexto() +
+                           " ya está guardada en PDF en la carpeta del cliente; se imprimirá cuando conecte una impresora.");
     const int copias = static_cast<int>(std::clamp(repo().configEntero("CopiasComprobante", 1), 1L, 5L));
     std::string error;
-    if (!imprimirLienzo(l, impresora, copias, W("Comprobante " + numero6(f.numero)), std::wstring(), error))
+    if (!imprimirLienzo(l, impresora, copias, W("Comprobante " + f.numeroTexto()), std::wstring(), error))
         throw std::runtime_error(error);
     return impresora;
+}
+
+std::wstring rutaPdfComprobante(long facturaId) {
+    const auto f = repo().facturaPorId(facturaId);
+    if (!f) throw ErrorNegocio("El comprobante no existe.");
+    const auto c = repo().clientePorId(f->clienteId);
+    if (!c) throw ErrorNegocio("El cliente del comprobante no existe.");
+    return carpetaFacturasCliente(*c) + L"\\Comprobante_" + W(f->numeroTexto()) + L".pdf";
 }
 
 std::wstring guardarPdfComprobante(long facturaId) {
@@ -233,29 +255,33 @@ std::wstring guardarPdfComprobante(long facturaId) {
             "No se encontró la impresora \"Microsoft Print to PDF\" de Windows. Actívela en Panel de control > "
             "Programas > Activar o desactivar las características de Windows.");
     const std::wstring carpeta = carpetaFacturasCliente(c);
-    const std::wstring base = carpeta + L"\\Comprobante_" + W(numero6(f.numero));
+    const std::wstring base = carpeta + L"\\Comprobante_" + W(f.numeroTexto());
     std::wstring ruta = base + L".pdf";
     // Si ya existe (por ejemplo, abierto en un visor de PDF) se usa otro nombre.
     for (int i = 2; existeArchivo(ruta) && !DeleteFileW(ruta.c_str()) && i < 50; ++i)
         ruta = base + L" (" + std::to_wstring(i) + L").pdf";
     std::string error;
-    if (!imprimirLienzo(l, pdf, 1, W("Comprobante " + numero6(f.numero)), ruta, error)) throw std::runtime_error(error);
+    if (!imprimirLienzo(l, pdf, 1, W("Comprobante " + f.numeroTexto()), ruta, error)) throw std::runtime_error(error);
     return ruta;
 }
 
 // ================================================================ Visor dentro del programa
 namespace {
 
-const wchar_t* const CLASE_VISOR = L"BeneficioUnimaxVisorComprobante";
-enum { ID_IMPRIMIR = 101, ID_PDF, ID_CARPETA, ID_EXCEL, ID_CERRAR, NUM_BOTONES = 5 };
+const wchar_t* const CLASE_VISOR = L"BeneficioUnimaxVisor";
+constexpr int ID_PRIMER_BOTON = 101;
+
+struct BotonVisor {
+    std::wstring texto;
+    int ancho;  // a 96 ppp
+    std::function<void(HWND)> accion;  // vacía = cerrar
+};
 
 struct Visor {
     Lienzo lienzo;
-    long facturaId = 0;
-    Factura factura;
-    Cliente cliente;
+    std::vector<BotonVisor> botones;
+    std::vector<HWND> controles;
     HWND duenio = nullptr;
-    HWND botones[NUM_BOTONES] = {};
     bool cerrado = false;
 };
 
@@ -266,7 +292,7 @@ int px(int valor) {
     return r;
 }
 
-int altoBarra() { return px(52); }
+int altoBarra() { return px(56); }
 
 void cerrarVisor(HWND h, Visor* v) {
     if (v && v->duenio) EnableWindow(v->duenio, TRUE);  // antes de destruir, para que el foco vuelva al programa
@@ -280,7 +306,6 @@ void pintarVisor(HWND h, HDC dc, Visor* v) {
     HDC mem = CreateCompatibleDC(dc);
     HBITMAP bmp = CreateCompatibleBitmap(dc, std::max(1, w), std::max(1, alto));
     HGDIOBJ anterior = SelectObject(mem, bmp);
-    // Fondo y barra de botones.
     HBRUSH gris = CreateSolidBrush(RGB(96, 96, 96));
     FillRect(mem, &cliente, gris);
     DeleteObject(gris);
@@ -288,7 +313,6 @@ void pintarVisor(HWND h, HDC dc, Visor* v) {
     HBRUSH crema = CreateSolidBrush(RGB(241, 234, 219));
     FillRect(mem, &barra, crema);
     DeleteObject(crema);
-    // Hoja completa, del mayor tamaño que cabe.
     if (v) {
         const int margen = px(14);
         const int disponibleW = w - 2 * margen, disponibleH = alto - altoBarra() - 2 * margen;
@@ -317,23 +341,23 @@ LRESULT CALLBACK procVisor(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_CREATE: {
             v = static_cast<Visor*>(reinterpret_cast<CREATESTRUCTW*>(lp)->lpCreateParams);
             SetWindowLongPtrW(h, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(v));
-            const wchar_t* const textos[NUM_BOTONES] = {L"Imprimir", L"Guardar PDF", L"Abrir carpeta del cliente",
-                                                        L"Abrir en Excel", L"Cerrar"};
-            for (int i = 0; i < NUM_BOTONES; ++i) {
-                v->botones[i] = CreateWindowExW(0, L"BUTTON", textos[i], WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                                                0, 0, 10, 10, h, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_IMPRIMIR + i)),
-                                                App::instancia().hInst, nullptr);
-                SendMessageW(v->botones[i], WM_SETFONT, reinterpret_cast<WPARAM>(fuenteNegrita()), TRUE);
+            for (size_t i = 0; i < v->botones.size(); ++i) {
+                HWND b = CreateWindowExW(0, L"BUTTON", v->botones[i].texto.c_str(),
+                                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 0, 0, 10, 10, h,
+                                         reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_PRIMER_BOTON + i)),
+                                         App::instancia().hInst, nullptr);
+                SendMessageW(b, WM_SETFONT, reinterpret_cast<WPARAM>(fuente(tamanoLetra() + 1, true)), TRUE);
+                v->controles.push_back(b);
             }
             return 0;
         }
         case WM_SIZE: {
             if (!v) return 0;
-            const int anchos[NUM_BOTONES] = {px(110), px(130), px(200), px(140), px(100)};
             int x = px(12);
-            for (int i = 0; i < NUM_BOTONES; ++i) {
-                SetWindowPos(v->botones[i], nullptr, x, px(9), anchos[i], altoBarra() - px(18), SWP_NOZORDER);
-                x += anchos[i] + px(8);
+            for (size_t i = 0; i < v->controles.size(); ++i) {
+                const int ancho = px(v->botones[i].ancho);
+                SetWindowPos(v->controles[i], nullptr, x, px(9), ancho, altoBarra() - px(18), SWP_NOZORDER);
+                x += ancho + px(8);
             }
             InvalidateRect(h, nullptr, FALSE);
             return 0;
@@ -349,43 +373,26 @@ LRESULT CALLBACK procVisor(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         }
         case WM_GETMINMAXINFO: {
             auto* mm = reinterpret_cast<MINMAXINFO*>(lp);
-            mm->ptMinTrackSize.x = px(760);
+            mm->ptMinTrackSize.x = px(700);
             mm->ptMinTrackSize.y = px(500);
             return 0;
         }
-        case WM_COMMAND:
+        case WM_COMMAND: {
             if (!v) return 0;
-            switch (LOWORD(wp)) {
-                case ID_IMPRIMIR:
-                    intentar(h, [&] {
-                        CursorEspera espera;
-                        const std::wstring impresora = imprimirComprobante(v->facturaId);
-                        mostrarInfo(h, "El comprobante se envió a la impresora \"" + U(impresora) + "\".");
-                    });
-                    return 0;
-                case ID_PDF:
-                    intentar(h, [&] {
-                        CursorEspera espera;
-                        const std::wstring ruta = guardarPdfComprobante(v->facturaId);
-                        mostrarInfo(h, "PDF guardado en:\n" + U(ruta));
-                    });
-                    return 0;
-                case ID_CARPETA:
-                    abrirCarpeta(carpetaFacturasCliente(v->cliente));
-                    return 0;
-                case ID_EXCEL: {
-                    Documento doc;
-                    if (intentar(h, [&] { doc = docComprobanteCompra(repo().empresa(), v->factura, v->cliente); }))
-                        generarYMostrar(h, doc);
-                    return 0;
-                }
-                case ID_CERRAR:
-                case IDCANCEL:
-                    cerrarVisor(h, v);
-                    return 0;
-                default:
-                    return 0;
+            const int id = LOWORD(wp);
+            if (id == IDCANCEL) {
+                cerrarVisor(h, v);
+                return 0;
             }
+            const int i = id - ID_PRIMER_BOTON;
+            if (i >= 0 && i < static_cast<int>(v->botones.size())) {
+                if (v->botones[static_cast<size_t>(i)].accion)
+                    intentar(h, [&] { v->botones[static_cast<size_t>(i)].accion(h); });
+                else
+                    cerrarVisor(h, v);
+            }
+            return 0;
+        }
         case WM_CLOSE:
             cerrarVisor(h, v);
             return 0;
@@ -398,13 +405,12 @@ LRESULT CALLBACK procVisor(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(h, msg, wp, lp);
 }
 
-}  // namespace
-
-void verComprobante(HWND padre, long facturaId) {
+// Muestra un lienzo en una ventana del programa, con los botones indicados (más "Cerrar").
+void mostrarLienzo(HWND padre, const Lienzo& lienzo, const std::wstring& titulo, std::vector<BotonVisor> botones) {
     Visor v;
-    v.facturaId = facturaId;
-    if (!intentar(padre, [&] { v.lienzo = lienzoDeFactura(facturaId, &v.factura, &v.cliente); })) return;
-
+    v.lienzo = lienzo;
+    v.botones = std::move(botones);
+    v.botones.push_back({L"Cerrar", 100, nullptr});
     static bool registrada = false;
     if (!registrada) {
         WNDCLASSEXW wc{};
@@ -422,16 +428,16 @@ void verComprobante(HWND padre, long facturaId) {
     SystemParametersInfoW(SPI_GETWORKAREA, 0, &trabajo, 0);
     const int altoT = trabajo.bottom - trabajo.top, anchoT = trabajo.right - trabajo.left;
     const int alto = altoT * 96 / 100;
-    const int ancho = std::min(anchoT * 95 / 100, std::max(px(820), static_cast<int>((alto - altoBarra()) * 0.80)));
-    const std::wstring titulo =
-        L"Comprobante de compra No. " + W(numero6(v.factura.numero)) + L"  -  " + W(v.cliente.nombre);
+    int anchoBotones = px(40);
+    for (const auto& b : v.botones) anchoBotones += px(b.ancho + 8);
+    const int ancho = std::min(anchoT * 95 / 100, std::max(anchoBotones, static_cast<int>((alto - altoBarra()) * 0.80)));
     HWND h = CreateWindowExW(0, CLASE_VISOR, titulo.c_str(), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                              trabajo.left + (anchoT - ancho) / 2, trabajo.top + (altoT - alto) / 2, ancho, alto, v.duenio,
                              nullptr, App::instancia().hInst, &v);
     if (!h) return;
     if (v.duenio) EnableWindow(v.duenio, FALSE);
     ShowWindow(h, SW_SHOW);
-    SetFocus(v.botones[0]);
+    if (!v.controles.empty()) SetFocus(v.controles[0]);
     MSG m;
     bool salir = false;
     while (!v.cerrado) {
@@ -450,6 +456,61 @@ void verComprobante(HWND padre, long facturaId) {
         SetForegroundWindow(v.duenio);
     }
     if (salir) PostQuitMessage(static_cast<int>(m.wParam));
+}
+
+}  // namespace
+
+void verComprobante(HWND padre, long facturaId) {
+    Factura f;
+    Cliente c;
+    Lienzo l;
+    if (!intentar(padre, [&] { l = lienzoDeFactura(facturaId, &f, &c); })) return;
+    std::vector<BotonVisor> botones;
+    botones.push_back({L"Imprimir", 110, [facturaId](HWND h) {
+                           CursorEspera espera;
+                           mostrarInfo(h, "El comprobante se envió a la impresora \"" + U(imprimirComprobante(facturaId)) + "\".");
+                       }});
+    botones.push_back({L"Abrir carpeta del cliente", 200, [c](HWND) { abrirCarpeta(carpetaFacturasCliente(c)); }});
+    botones.push_back({L"Abrir en Excel", 140, [f, c](HWND h) {
+                           generarYMostrar(h, docComprobanteCompra(repo().empresa(), f, c));
+                       }});
+    mostrarLienzo(padre, l, L"Comprobante de compra " + W(f.numeroTexto()) + L"  -  " + W(c.nombre), std::move(botones));
+}
+
+Lienzo lienzoInforme(const Fecha& dia) {
+    const auto resumen = [](const Fecha& desde, const Fecha& hasta) {
+        return sumarResumenes(resumirPorDia(repo().detalleCompras(desde, hasta)));
+    };
+    ResumenDia hoy = resumen(dia, dia);
+    hoy.fecha = dia;
+    return lienzoInformeDia(repo().empresa(), dia, hoy, resumen(dia.primerDiaDelMes(), dia),
+                            resumen(inicioCosecha(dia), dia), inicioCosecha(dia));
+}
+
+void verInformeDia(HWND padre, const Fecha& dia) {
+    Lienzo l;
+    if (!intentar(padre, [&] { l = lienzoInforme(dia); })) return;
+    std::vector<BotonVisor> botones;
+    botones.push_back({L"Imprimir", 110, [l, dia](HWND h) {
+                           const std::wstring impresora = impresoraConfigurada();
+                           if (impresora.empty()) throw ErrorNegocio("No hay una impresora conectada.");
+                           std::string error;
+                           CursorEspera espera;
+                           if (!imprimirLienzo(l, impresora, 1, W("Informe del día " + dia.texto()), std::wstring(), error))
+                               throw std::runtime_error(error);
+                           mostrarInfo(h, "El informe se envió a la impresora \"" + U(impresora) + "\".");
+                       }});
+    botones.push_back({L"Reporte general (Excel)", 200, [dia](HWND h) { generarReporteGeneral(h, dia); }});
+    mostrarLienzo(padre, l, L"Informe del día " + W(dia.texto()), std::move(botones));
+}
+
+void generarReporteGeneral(HWND padre, const Fecha& hasta) {
+    Documento doc;
+    const Fecha desde = inicioCosecha(hasta);
+    if (intentar(padre, [&] {
+            doc = docReporteGeneral(repo().empresa(), desde, hasta, resumirPorDia(repo().detalleCompras(desde, hasta)));
+        }))
+        generarYMostrar(padre, doc);
 }
 
 }  // namespace bu::win

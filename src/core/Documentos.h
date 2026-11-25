@@ -46,6 +46,8 @@ Documento docReporteCompras(const Empresa& e, const Fecha& desde, const Fecha& h
 Documento docReporteVentas(const Empresa& e, const Fecha& desde, const Fecha& hasta, const std::vector<Venta>& ventas);
 Documento docReporteCaja(const Empresa& e, const Fecha& desde, const Fecha& hasta, const std::vector<CierreCaja>& cierres);
 
+Documento docReporteGeneral(const Empresa& e, const Fecha& desde, const Fecha& hasta, const std::vector<ResumenDia>& dias);
+
 // Todos los nombres de celda que usa cada plantilla (para verificar las plantillas).
 std::vector<std::pair<std::string, std::vector<std::string>>> nombresPorPlantilla();
 

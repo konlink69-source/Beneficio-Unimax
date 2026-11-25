@@ -23,11 +23,6 @@ Valor N(double d) { return d; }
 Valor F(const Fecha& f) { return f.vacia() ? Valor() : Valor(f); }
 Valor FO(const std::optional<Fecha>& f) { return f ? Valor(*f) : Valor(std::string("Sin fecha")); }
 
-std::string numero6(long n) {
-    char buf[16];
-    std::snprintf(buf, sizeof buf, "%06ld", n);
-    return buf;
-}
 
 std::string rango(const Fecha& desde, const Fecha& hasta) { return desde.iso() + "_a_" + hasta.iso(); }
 
@@ -43,9 +38,9 @@ Documento docComprobanteCompra(const Empresa& e, const Factura& f, const Cliente
     Documento d;
     d.plantilla = "Factura.xlsx";
     d.subcarpeta = "Facturas\\" + nombreCarpetaCliente(c.nombre, c.dni);  // una carpeta por cliente
-    d.nombreArchivo = "Comprobante_" + numero6(f.numero);
+    d.nombreArchivo = "Comprobante_" + f.numeroTexto();
     encabezado(d, e);
-    d.celdas.push_back({"NUMERO", T(numero6(f.numero))});
+    d.celdas.push_back({"NUMERO", T(f.numeroTexto())});
     d.celdas.push_back({"FECHA", F(f.fecha)});
     d.celdas.push_back({"CLIENTE", T(c.nombre)});
     d.celdas.push_back({"DNI", T(c.dni)});
@@ -340,6 +335,35 @@ Documento docReporteCaja(const Empresa& e, const Fecha& desde, const Fecha& hast
     return d;
 }
 
+// ------------------------------------------------------------------ Reporte general (una fila por día)
+Documento docReporteGeneral(const Empresa& e, const Fecha& desde, const Fecha& hasta, const std::vector<ResumenDia>& dias) {
+    Documento d;
+    d.plantilla = "ReporteGeneral.xlsx";
+    d.subcarpeta = "Reportes";
+    d.nombreArchivo = "Reporte_general_" + rango(desde, hasta);
+    encabezado(d, e);
+    d.celdas.push_back({"DESDE", F(desde)});
+    d.celdas.push_back({"HASTA", F(hasta)});
+    TablaDocumento t;
+    t.nombre = "DIAS";
+    t.formatos = {FMT_FECHA, FMT_PESO, FMT_PESO, FMT_PESO, FMT_PESO, FMT_PESO, FMT_PESO, FMT_PESO, FMT_ENTERO, FMT_ENTERO};
+    for (const auto& x : dias)
+        t.filas.push_back({F(x.fecha), N(x.libras[CAFE_UVA]), N(aQuintales(x.libras[CAFE_UVA])), N(x.libras[CAFE_HUMEDO]),
+                           N(aQuintales(x.libras[CAFE_HUMEDO])), N(x.libras[CAFE_SECO]), N(aQuintales(x.libras[CAFE_SECO])),
+                           N(aQuintales(x.librasPergamino())), N(x.comprobantesUva), N(x.comprobantesPergamino)});
+    d.tablas.push_back(t);
+    const ResumenDia total = sumarResumenes(dias);
+    d.celdas.push_back({"UVA_LB", N(total.libras[CAFE_UVA])});
+    d.celdas.push_back({"UVA_QQ", N(aQuintales(total.libras[CAFE_UVA]))});
+    d.celdas.push_back({"HUMEDO_LB", N(total.libras[CAFE_HUMEDO])});
+    d.celdas.push_back({"HUMEDO_QQ", N(aQuintales(total.libras[CAFE_HUMEDO]))});
+    d.celdas.push_back({"SECO_LB", N(total.libras[CAFE_SECO])});
+    d.celdas.push_back({"SECO_QQ", N(aQuintales(total.libras[CAFE_SECO]))});
+    d.celdas.push_back({"PERGAMINO_QQ", N(aQuintales(total.librasPergamino()))});
+    d.celdas.push_back({"DIAS_COMPRA", N(static_cast<double>(dias.size()))});
+    return d;
+}
+
 // ------------------------------------------------------------------ Nombres usados
 std::vector<std::pair<std::string, std::vector<std::string>>> nombresPorPlantilla() {
     const Empresa e;
@@ -354,6 +378,7 @@ std::vector<std::pair<std::string, std::vector<std::string>>> nombresPorPlantill
         docReporteCompras(e, f, f, {}, {}),
         docReporteVentas(e, f, f, {}),
         docReporteCaja(e, f, f, {}),
+        docReporteGeneral(e, f, f, {}),
     };
     std::vector<std::pair<std::string, std::vector<std::string>>> r;
     for (const auto& d : docs) {

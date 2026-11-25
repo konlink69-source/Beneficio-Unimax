@@ -13,11 +13,6 @@ namespace bu::win {
 
 namespace {
 
-std::string numero6(long n) {
-    char buf[16];
-    std::snprintf(buf, sizeof buf, "%06ld", n);
-    return buf;
-}
 
 class PaginaFactura : public Pagina {
 public:
@@ -59,8 +54,26 @@ public:
     }
 
     void alMostrar() override {
-        ponerTexto(h_, IDC_F_NUMERO, numero6(repo().siguienteNumeroFactura()));
+        actualizarNumero();
         cargarPrecios(false);
+    }
+
+    // El logo del beneficio, tenue, al centro de la tabla de líneas (marca de agua de la pestaña).
+    void alRedimensionar(int ancho, int alto) override {
+        Pagina::alRedimensionar(ancho, alto);
+        HWND lista = GetDlgItem(h_, IDC_F_LINEAS);
+        RECT r;
+        GetClientRect(lista, &r);
+        if (r.right < 50 || r.bottom < 30 || (r.right == tamLogo_.cx && r.bottom == tamLogo_.cy)) return;
+        tamLogo_ = {r.right, r.bottom};
+        LVBKIMAGEW bk{};
+        bk.hbm = App::instancia().logoTenue(r.right * 3 / 4, r.bottom * 9 / 10);
+        if (!bk.hbm) return;
+        bk.ulFlags = LVBKIF_SOURCE_HBITMAP | LVBKIF_STYLE_NORMAL;
+        bk.xOffsetPercent = 50;
+        bk.yOffsetPercent = 50;
+        SendMessageW(lista, LVM_SETBKIMAGEW, 0, reinterpret_cast<LPARAM>(&bk));
+        ListView_SetTextBkColor(lista, CLR_NONE);
     }
 
     bool alComando(int id, int codigo) override {
@@ -73,7 +86,11 @@ public:
                 if (codigo == CBN_SELCHANGE) {
                     ponerPrecioSugerido();
                     actualizarSubtotal();
+                    actualizarNumero();
                 }
+                return true;
+            case IDC_F_INFORME:
+                verInformeDia(h_, Fecha::hoy());
                 return true;
             case IDC_F_UNIDAD:
                 if (codigo == CBN_SELCHANGE) actualizarSubtotal();
@@ -219,6 +236,13 @@ private:
                                  " líneas. Guarde este y haga otro.");
             return false;
         }
+        if (!lineas_.empty() && categoriaDe(tipoActual()) != categoriaDe(lineas_.front().tipoCafe)) {
+            mostrarAviso(h_, std::string("Esta factura es de ") +
+                                 (categoriaDe(lineas_.front().tipoCafe) == CATEGORIA_UVA ? "UVA" : "PERGAMINO") +
+                                 ". Las facturas de uva y de pergamino van aparte: guarde esta y haga otra para " +
+                                 (categoriaDe(tipoActual()) == CATEGORIA_UVA ? "la uva." : "el pergamino."));
+            return false;
+        }
         LineaFactura l;
         l.tipoCafe = tipoActual();
         l.libras = redondear(aLibras(*cantidad, unidadActual()), 2);
@@ -244,6 +268,7 @@ private:
     }
 
     void refrescarLineas() {
+        actualizarNumero();
         lvLimpiar(h_, IDC_F_LINEAS);
         for (size_t i = 0; i < lineas_.size(); ++i) {
             const auto& l = lineas_[i];
@@ -316,9 +341,10 @@ private:
                         (f.vencimientoSaldo ? " (pagar el " + f.vencimientoSaldo->texto() + ")" : std::string(" (sin fecha)"));
         if (!confirmar(h_, pregunta)) return;
         if (!intentar(h_, [&] { repo().registrarFactura(f); })) return;
-        const long numero = f.numero;
+        const std::string numero = f.numeroTexto();
         const long id = f.id;
         limpiar();
+        if (f.pagado > 0) App::instancia().avisarCajaBaja(h_);
         // Copia en PDF en la carpeta del cliente (Documentos\Facturas\<cliente>).
         std::string avisoPdf;
         if (repo().config("GuardarPdfComprobante", "1") == "1") {
@@ -334,10 +360,10 @@ private:
             try {
                 CursorEspera espera;
                 const std::wstring impresora = imprimirComprobante(id);
-                mostrarInfo(h_, "Comprobante No. " + numero6(numero) + " guardado e impreso en \"" + U(impresora) +
+                mostrarInfo(h_, "Factura " + numero + " guardada e impresa en \"" + U(impresora) +
                                     "\"." + avisoPdf);
             } catch (const std::exception& e) {
-                if (confirmar(h_, "El comprobante No. " + numero6(numero) + " se guardó, pero no se pudo imprimir:\n" +
+                if (confirmar(h_, "La factura " + numero + " se guardó, pero no se pudo imprimir:\n" +
                                       e.what() + "\n\n¿Desea verlo en pantalla?"))
                     verComprobante(h_, id);
             }
@@ -347,6 +373,15 @@ private:
         }
     }
 
+    // Número que tendrá la factura (U- o P- según el tipo de café) y su tipo, bien visible.
+    void actualizarNumero() {
+        const int categoria = categoriaDe(lineas_.empty() ? tipoActual() : lineas_.front().tipoCafe);
+        ponerTexto(h_, IDC_F_NUMERO, numeroFactura(categoria, repo().siguienteNumeroFactura(categoria)) + "  ·  " +
+                                         (categoria == CATEGORIA_UVA ? "UVA" : "PERGAMINO"));
+        colorTexto(IDC_F_NUMERO, categoria == CATEGORIA_UVA ? RGB(155, 27, 48) : RGB(138, 90, 60));
+    }
+
+    SIZE tamLogo_{0, 0};
     EntradaCliente cliente_;
     std::vector<LineaFactura> lineas_;
     PreciosDia precios_;

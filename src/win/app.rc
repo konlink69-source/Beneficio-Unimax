@@ -76,6 +76,7 @@ BEGIN
     POPUP "&Ver"
     BEGIN
         MENUITEM "&Recordatorio de deudas de hoy", IDM_RECORDATORIO
+        MENUITEM "&Informe del día", IDM_INFORME
     END
     POPUP "Ay&uda"
     BEGIN
@@ -105,10 +106,10 @@ BEGIN
     LTEXT           "", IDC_F_INFO, 14, 34, 532, 9
 
     LTEXT           "Comprobante No.:", IDC_STATIC, 8, 57, 62, 8
-    LTEXT           "", IDC_F_NUMERO, 72, 55, 50, 11
-    LTEXT           "Fecha:", IDC_STATIC, 128, 57, 24, 8
-    CONTROL         "", IDC_F_FECHA, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 154, 54, 66, 14
-    LTEXT           "", IDC_F_PRECIOS, 228, 57, 326, 9
+    LTEXT           "", IDC_F_NUMERO, 72, 55, 118, 11
+    LTEXT           "Fecha:", IDC_STATIC, 194, 57, 24, 8
+    CONTROL         "", IDC_F_FECHA, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 220, 54, 66, 14
+    LTEXT           "", IDC_F_PRECIOS, 292, 57, 262, 18
 
     GROUPBOX        "2. Café pesado (el pago se calcula por libra; 1 quintal = 100 libras)", IDC_STATIC, 6, 72, 548, 50
     LTEXT           "Tipo de café:", IDC_STATIC, 14, 84, 60, 8
@@ -138,10 +139,11 @@ BEGIN
     CONTROL         "", IDC_F_VENCE, "SysDateTimePick32", DTS_SHORTDATEFORMAT | DTS_SHOWNONE | WS_TABSTOP, 112, 252, 72, 14
     LTEXT           "(opcional) El saldo queda registrado como deuda y aparece en el recordatorio diario.", IDC_STATIC, 194, 255, 360, 9
     LTEXT           "Observaciones:", IDC_STATIC, 8, 273, 56, 8
-    EDITTEXT        IDC_F_OBS, 66, 270, 270, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "Guardar e imprimir", IDC_F_GUARDAR_IMP, 344, 268, 74, 18
-    PUSHBUTTON      "Guardar", IDC_F_GUARDAR, 422, 268, 50, 18
-    PUSHBUTTON      "Nuevo (limpiar)", IDC_F_LIMPIAR, 476, 268, 78, 18
+    EDITTEXT        IDC_F_OBS, 66, 270, 190, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Informe del día", IDC_F_INFORME, 262, 268, 66, 18
+    PUSHBUTTON      "Guardar e imprimir", IDC_F_GUARDAR_IMP, 332, 268, 80, 18
+    PUSHBUTTON      "Guardar", IDC_F_GUARDAR, 416, 268, 54, 18
+    PUSHBUTTON      "Nuevo (limpiar)", IDC_F_LIMPIAR, 474, 268, 80, 18
 END
 
 // =====================================================================  Facturas por cliente
@@ -174,28 +176,31 @@ IDD_PAG_CLIENTES DIALOGEX 0, 0, 560, 298
 STYLE ESTILO_PAGINA
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
-    GROUPBOX        "Datos del cliente", IDC_STATIC, 6, 2, 548, 64
-    LTEXT           "", IDC_C_MODO, 14, 13, 400, 9
-    LTEXT           "Nombre completo:", IDC_STATIC, 14, 28, 62, 8
-    EDITTEXT        IDC_C_NOMBRE, 78, 26, 170, 14, ES_AUTOHSCROLL
-    LTEXT           "DNI / RTN:", IDC_STATIC, 254, 28, 38, 8
-    EDITTEXT        IDC_C_DNI, 294, 26, 86, 14, ES_AUTOHSCROLL
-    LTEXT           "Teléfono:", IDC_STATIC, 386, 28, 34, 8
-    EDITTEXT        IDC_C_TELEFONO, 422, 26, 124, 14, ES_AUTOHSCROLL
-    LTEXT           "Dirección:", IDC_STATIC, 14, 46, 62, 8
-    EDITTEXT        IDC_C_DIRECCION, 78, 44, 302, 14, ES_AUTOHSCROLL
-    LTEXT           "Tipo:", IDC_STATIC, 386, 46, 34, 8
-    COMBOBOX        IDC_C_TIPO, 422, 44, 124, 60, COMBO
-    PUSHBUTTON      "Nuevo", IDC_C_NUEVO, 6, 72, 50, 16
-    PUSHBUTTON      "Guardar", IDC_C_GUARDAR, 60, 72, 50, 16
-    PUSHBUTTON      "Eliminar", IDC_C_ELIMINAR, 114, 72, 50, 16
-    PUSHBUTTON      "Estado de cuenta (Excel)", IDC_C_ESTADO, 168, 72, 100, 16
-    LTEXT           "Buscar:", IDC_STATIC, 300, 76, 28, 8
-    EDITTEXT        IDC_C_BUSCAR, 330, 73, 150, 14, ES_AUTOHSCROLL
-    LTEXT           "", IDC_C_RESUMEN, 486, 76, 68, 9
-    CONTROL         "", IDC_C_LISTA, "SysListView32", LISTA, 6, 94, 548, 198
+    LTEXT           "Buscar cliente:", IDC_C_BUSCAR_LBL, 6, 6, 74, 12
+    EDITTEXT        IDC_C_BUSCAR, 82, 3, 376, 17, ES_AUTOHSCROLL
+    LTEXT           "", IDC_C_RESUMEN, 466, 7, 88, 9
+    GROUPBOX        "Datos del cliente", IDC_STATIC, 6, 24, 548, 82
+    LTEXT           "", IDC_C_MODO, 14, 35, 400, 9
+    LTEXT           "Nombre completo:", IDC_STATIC, 14, 50, 62, 8
+    EDITTEXT        IDC_C_NOMBRE, 78, 48, 170, 14, ES_AUTOHSCROLL
+    LTEXT           "DNI:", IDC_STATIC, 254, 50, 38, 8
+    EDITTEXT        IDC_C_DNI, 294, 48, 86, 14, ES_AUTOHSCROLL
+    LTEXT           "Teléfono:", IDC_STATIC, 386, 50, 34, 8
+    EDITTEXT        IDC_C_TELEFONO, 422, 48, 124, 14, ES_AUTOHSCROLL
+    LTEXT           "Dirección:", IDC_STATIC, 14, 68, 62, 8
+    EDITTEXT        IDC_C_DIRECCION, 78, 66, 302, 14, ES_AUTOHSCROLL
+    LTEXT           "Tipo:", IDC_STATIC, 386, 68, 34, 8
+    COMBOBOX        IDC_C_TIPO, 422, 66, 124, 60, COMBO
+    LTEXT           "RTN (opcional):", IDC_STATIC, 14, 86, 62, 8
+    EDITTEXT        IDC_C_RTN, 78, 84, 100, 14, ES_AUTOHSCROLL
+    LTEXT           "Carnet IHCAFE (opcional):", IDC_STATIC, 186, 86, 92, 8
+    EDITTEXT        IDC_C_CARNET, 280, 84, 100, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Nuevo", IDC_C_NUEVO, 6, 112, 56, 18
+    PUSHBUTTON      "Guardar", IDC_C_GUARDAR, 66, 112, 56, 18
+    PUSHBUTTON      "Eliminar", IDC_C_ELIMINAR, 126, 112, 56, 18
+    PUSHBUTTON      "Estado de cuenta (Excel)", IDC_C_ESTADO, 186, 112, 104, 18
+    CONTROL         "", IDC_C_LISTA, "SysListView32", LISTA, 6, 136, 548, 156
 END
-
 // =====================================================================  Precio del día
 IDD_PAG_PRECIOS DIALOGEX 0, 0, 560, 298
 STYLE ESTILO_PAGINA
@@ -347,8 +352,12 @@ BEGIN
     LTEXT           "Lo que el beneficio debe y lo que le deben, con las fechas de pago (no usa el período).", IDC_STATIC, 144, 166, 410, 9
     PUSHBUTTON      "Estado de cuenta de un cliente...", IDC_R_ESTADO, 6, 188, 130, 22
     LTEXT           "Deudas y abonos de un cliente o productor.", IDC_STATIC, 144, 194, 410, 9
-    PUSHBUTTON      "Abrir carpeta de documentos", IDC_R_CARPETA, 6, 226, 130, 18
-    LTEXT           "", IDC_R_INFO, 144, 226, 410, 20
+    PUSHBUTTON      "Informe del día (fecha Hasta)", IDC_R_INFORME, 6, 216, 130, 22
+    LTEXT           "Libras y quintales de uva y de pergamino (húmedo y seco) por separado: el día, el mes y la cosecha.", IDC_STATIC, 144, 222, 410, 9
+    PUSHBUTTON      "Reporte general de la cosecha", IDC_R_GENERAL, 6, 244, 130, 22
+    LTEXT           "Excel con una fila por día desde el 1 de octubre; se vuelve a crear con los datos al día cada vez.", IDC_STATIC, 144, 250, 410, 9
+    PUSHBUTTON      "Abrir carpeta de documentos", IDC_R_CARPETA, 6, 272, 130, 18
+    LTEXT           "", IDC_R_INFO, 144, 272, 410, 20
 END
 
 // =====================================================================  Configuración
@@ -370,10 +379,12 @@ BEGIN
     LTEXT           "Saldo inicial de la caja (L):", IDC_STATIC, 14, 97, 100, 8
     EDITTEXT        IDC_G_APERTURA, 116, 95, 70, 14, NUM
     LTEXT           "Dinero en caja el primer día de uso (solo cuenta antes del primer cierre).", IDC_STATIC, 14, 112, 252, 9
-    LTEXT           "Primer No. de comprobante:", IDC_STATIC, 14, 128, 100, 8
-    EDITTEXT        IDC_G_NUMFAC, 116, 126, 50, 14, ES_NUMBER | ES_AUTOHSCROLL
-    LTEXT           "Primer No. de venta:", IDC_STATIC, 14, 146, 100, 8
-    EDITTEXT        IDC_G_NUMVEN, 116, 144, 50, 14, ES_NUMBER | ES_AUTOHSCROLL
+    LTEXT           "Primer No. de factura:", IDC_STATIC, 14, 128, 84, 8
+    EDITTEXT        IDC_G_NUMFAC, 100, 126, 40, 14, ES_NUMBER | ES_AUTOHSCROLL
+    LTEXT           "Primer No. de venta:", IDC_STATIC, 14, 146, 84, 8
+    EDITTEXT        IDC_G_NUMVEN, 100, 144, 40, 14, ES_NUMBER | ES_AUTOHSCROLL
+    LTEXT           "Alerta si en caja hay menos de (L):", IDC_STATIC, 148, 124, 120, 8
+    EDITTEXT        IDC_G_MINIMO, 148, 135, 70, 14, NUM
     AUTOCHECKBOX    "Guardar en PDF los reportes de Excel", IDC_G_PDF, 14, 161, 250, 10
 
     GROUPBOX        "Archivos", IDC_STATIC, 6, 180, 268, 76

@@ -42,7 +42,8 @@ public:
         textoGuia(h_, IDC_H_FILTRO, L"Nombre o DNI");
         lvConfigurar(h_, IDC_H_CLIENTES, {{L"Cliente (carpeta)", 150}, {L"Facturas", 34, true}});
         lvConfigurar(h_, IDC_H_LISTA,
-                     {{L"No.", 40},
+                     {{L"No.", 46},
+                      {L"Tipo", 50},
                       {L"Fecha", 50},
                       {L"Cliente", 120},
                       {L"Libras", 56, true},
@@ -107,7 +108,9 @@ public:
                 if (const long f = seleccionada())
                     intentar(h_, [&] {
                         CursorEspera espera;
-                        const std::wstring ruta = guardarPdfComprobante(f);
+                        // Se abre el PDF ya guardado; solo se crea si todavía no existe.
+                        std::wstring ruta = rutaPdfComprobante(f);
+                        if (!existeArchivo(ruta)) ruta = guardarPdfComprobante(f);
                         ShellExecuteW(nullptr, L"open", ruta.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
                     });
                 return true;
@@ -215,10 +218,9 @@ private:
         Centavos total = 0, pagado = 0, saldo = 0;
         for (const auto& f : facturas_) {
             if (carpeta_ != TODOS && f.clienteId != carpeta_) continue;
-            char num[16];
-            std::snprintf(num, sizeof num, "%06ld", f.numero);
+
             lvAgregar(h_, IDC_H_LISTA,
-                      {num, f.fecha.texto(), f.clienteNombre, formatoDecimal(f.totalLibras, 2),
+                      {f.numeroTexto(), f.categoria == CATEGORIA_UVA ? "UVA" : "PERGAMINO", f.fecha.texto(), f.clienteNombre, formatoDecimal(f.totalLibras, 2),
                        formatoDecimal(aQuintales(f.totalLibras), 2), formatoLempiras(f.total), formatoLempiras(f.pagado),
                        formatoLempiras(f.saldo), f.anulada ? "ANULADO" : "Válido"},
                       f.id);
@@ -268,7 +270,7 @@ private:
             mostrarInfo(h_, "Ese comprobante ya está anulado.");
             return;
         }
-        std::string aviso = "¿Anular el comprobante No. " + std::to_string(f->numero) + " de " + f->clienteNombre +
+        std::string aviso = "¿Anular la factura " + f->numeroTexto() + " de " + f->clienteNombre +
                             " por " + formatoLempiras(f->total) + "?";
         if (f->pagado > 0)
             aviso += "\n\nSe registrará en la caja de HOY una entrada de " + formatoLempiras(f->pagado) +

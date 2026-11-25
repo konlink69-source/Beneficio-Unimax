@@ -15,6 +15,7 @@ deudas con clientes y productores, caja diaria y ventas. Usa una base de datos *
 |---|---|
 | **Ingreso** | Al abrir, el programa pide **usuario y contraseña** (ver la sección 3). |
 | **Comprobante de compra** | Se escribe el DNI del productor (si ya existe, aparece su nombre; si no, se registra al guardar). Se agregan líneas de café pesado: tipo, peso en **libras o quintales**, **galones** (como dato) y precio por libra. El programa calcula los subtotales, el total, lo **pagado en efectivo** y el **saldo** que queda debiendo el beneficio, con una fecha de pago opcional. En el campo DNI también se puede escribir el **nombre** y presionar Enter para buscarlo. **Guardar e imprimir** manda el comprobante directo a la impresora; **Guardar** lo muestra dentro del programa. |
+| **Informe del día** | Botón en *Comprobante de compra* (y en *Reportes* y el menú *Ver*): libras y quintales de **uva**, **pergamino húmedo** y **pergamino seco** por separado, del día, del mes y de la cosecha (desde el 1 de octubre). Se ve dentro del programa y se imprime. El **reporte general** (Excel) tiene una fila por día de la cosecha y se vuelve a crear con los datos al día. |
 | **Facturas** | Una **carpeta por cliente** con todos sus comprobantes. Doble clic para **verlo dentro del programa** (sin Excel), imprimirlo, abrir su PDF o **anular** (devuelve el pago a la caja y anula el saldo pendiente). |
 | **Clientes** | Productores y compradores: nombre, DNI/RTN, teléfono, dirección. Muestra cuánto les debe el beneficio y cuánto le deben. Genera el **estado de cuenta** en Excel. |
 | **Precio del día** | Precio por libra de cada tipo de café para cada fecha. Se puede escribir por libra o por quintal (el otro se calcula solo). Se pone solo en los comprobantes del día y se puede cambiar en un comprobante en particular. |
@@ -28,11 +29,23 @@ deudas con clientes y productores, caja diaria y ventas. Usa una base de datos *
 1. **Al abrir el programa** (una vez al día) aparece una ventana con las deudas vencidas, las que vencen hoy y las que vencen pronto. También avisa si falta el precio del día o si quedó una caja sin cerrar.
 2. **Aviso de Windows** a la hora que usted elija, aunque el programa esté cerrado. Se activa en *Configuración → Activar aviso de Windows* y usa el Programador de tareas de Windows.
 
-**Pantalla:** el programa se abre a pantalla completa y elige solo el tamaño de letra para que las pestañas,
-los botones y las tablas aprovechen toda la pantalla.
+**Facturas de uva y de pergamino van aparte**, cada una con su numeración: `U-000001` (uva) y `P-000001`
+(pergamino; el húmedo y el seco pueden ir juntos). La factura muestra en una franja de color si es
+**CAFÉ UVA** o **CAFÉ PERGAMINO**, e incluye el RTN y el carnet IHCAFE del productor si los tiene.
 
-**Marca de agua** (*Configuración → Marca de agua*), en las tablas del programa, en el comprobante y en los
-reportes de Excel:
+**Alerta de caja:** después de cada pago, si en caja quedan menos de L 5,000 (se cambia en *Configuración*),
+aparece un aviso; mientras siga así se ve en rojo en el encabezado y en la pestaña *Caja*.
+
+**Imprimir** envía la factura directo a la impresora física (nunca a "Microsoft Print to PDF"). Si no hay
+impresora conectada, avisa que la factura ya está guardada en PDF.
+
+**Pantalla:** el programa se abre a pantalla completa y elige solo el tamaño de letra para que las pestañas,
+los botones y las tablas aprovechen toda la pantalla. Si cambia el tamaño de la ventana, los botones, letras y
+tablas se agrandan o achican con ella.
+
+**Marca de agua:** las facturas llevan siempre el sello redondo (opción 2) y la pestaña *Comprobante de compra*
+muestra el logo tenue al centro. Para las tablas del programa y los reportes de Excel se elige en
+*Configuración → Marca de agua*:
 - **Opción 1:** "UNIMAX" en diagonal con granos de café.
 - **Opción 2:** sello redondo con un grano de café.
 - **Sin marca de agua.**
@@ -226,7 +239,7 @@ src/core/   Lógica del negocio sin Windows: fechas, dinero (en centavos), DNI, 
 src/db/     ODBC (Access en Windows, SQLite en las pruebas), creación de tablas y Repositorio
             (todas las operaciones del negocio, con transacciones).
 src/win/    Interfaz Win32: ventana con pestañas, diálogos (app.rc), Excel por COM, avisos.
-tests/      Pruebas automáticas (303 comprobaciones).
+tests/      Pruebas automáticas (328 comprobaciones).
 plantillas/ Plantillas de Excel.
 tools/      Generadores del logo y de las plantillas, verificación de plantillas.
 logo/       Logo en SVG y PNG.

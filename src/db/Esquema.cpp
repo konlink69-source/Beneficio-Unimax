@@ -49,7 +49,7 @@ const std::vector<Tabla>& tablas() {
          "CREATE TABLE Facturas (Id %PK%, Numero LONG NOT NULL, Fecha DATETIME NOT NULL, "
          "HoraRegistro TEXT(8), ClienteId LONG NOT NULL, Total CURRENCY NOT NULL, Pagado CURRENCY NOT NULL, "
          "Saldo CURRENCY NOT NULL, Observaciones TEXT(255), Anulada LONG NOT NULL, FechaAnulacion DATETIME, "
-         "MotivoAnulacion TEXT(255), CONSTRAINT UQ_Facturas_Numero UNIQUE (Numero), "
+         "MotivoAnulacion TEXT(255), Categoria LONG, CONSTRAINT UQ_Facturas_Numero UNIQUE (Categoria, Numero), "
          "CONSTRAINT FK_Facturas_Cliente FOREIGN KEY (ClienteId) REFERENCES Clientes (Id))",
          {"CREATE INDEX IX_Facturas_Fecha ON Facturas (Fecha)"}},
         {"FacturaDetalle",
@@ -126,6 +126,20 @@ void crearEsquema(Conexion& c, Dialecto d) {
         if (!c.existeColumna(tabla, "Usuario"))
             c.ejecutar(std::string("ALTER TABLE ") + tabla + " ADD COLUMN Usuario TEXT(50)");
 
+    // Versión 3: RTN y carnet IHCAFE del cliente; facturas de uva y pergamino con numeración propia.
+    for (const char* col : {"RTN", "Carnet"})
+        if (!c.existeColumna("Clientes", col)) c.ejecutar(std::string("ALTER TABLE Clientes ADD COLUMN ") + col + " TEXT(30)");
+    if (!c.existeColumna("Facturas", "Categoria")) {
+        c.ejecutar("ALTER TABLE Facturas ADD COLUMN Categoria LONG");
+        c.ejecutar("UPDATE Facturas SET Categoria = 2");
+        c.ejecutar("UPDATE Facturas SET Categoria = 1 WHERE Id IN (SELECT FacturaId FROM FacturaDetalle WHERE TipoCafeId = 1)");
+        if (d == Dialecto::Access) {
+            // El número ya no es único en general, sino dentro de cada tipo (U-000001 y P-000001).
+            c.ejecutar("ALTER TABLE Facturas DROP CONSTRAINT UQ_Facturas_Numero");
+            c.ejecutar("CREATE UNIQUE INDEX UQ_Facturas_CatNum ON Facturas (Categoria, Numero)");
+        }
+    }
+
     // Tipos de café fijos.
     const std::pair<int, const char*> tipos[] = {{1, "Uva"}, {2, "Pergamino húmedo"}, {3, "Pergamino seco"}};
     for (const auto& tp : tipos) {
@@ -158,6 +172,7 @@ void crearEsquema(Conexion& c, Dialecto d) {
     insertarConfigSiFalta(c, "CopiasComprobante", "1");
     insertarConfigSiFalta(c, "GuardarPdfComprobante", "1");
     insertarConfigSiFalta(c, "CodigoRecuperacion", "");
+    insertarConfigSiFalta(c, "MinimoCaja", "5,000.00");
 }
 
 std::string cadenaConexionAccess(const std::string& rutaArchivo) {

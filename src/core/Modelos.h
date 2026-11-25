@@ -14,6 +14,12 @@ enum TipoCafe { CAFE_UVA = 1, CAFE_HUMEDO = 2, CAFE_SECO = 3 };
 constexpr int NUM_TIPOS_CAFE = 3;
 const char* nombreTipoCafe(int tipo);  // "Uva", "Pergamino húmedo", "Pergamino seco"
 
+// Las facturas de uva y de pergamino van aparte, cada una con su numeración (U-000001, P-000001).
+enum CategoriaCafe { CATEGORIA_UVA = 1, CATEGORIA_PERGAMINO = 2 };
+int categoriaDe(int tipoCafe);
+const char* nombreCategoria(int categoria);  // "UVA" o "PERGAMINO"
+std::string numeroFactura(int categoria, long numero);  // "U-000123" / "P-000123"
+
 // Máximo de líneas en un comprobante de compra (cabe en la plantilla de Excel).
 constexpr int MAX_LINEAS_FACTURA = 10;
 
@@ -29,6 +35,8 @@ struct Cliente {
     std::string direccion;
     int tipo = CLIENTE_PRODUCTOR;
     bool activo = true;
+    std::string rtn;     // opcional, 14 dígitos
+    std::string carnet;  // carnet de productor del IHCAFE (opcional)
 };
 
 // ---------------------------------------------------------------- Precios
@@ -53,12 +61,14 @@ struct LineaFactura {
 struct Factura {  // Comprobante de compra de café
     long id = 0;
     long numero = 0;
+    int categoria = CATEGORIA_PERGAMINO;  // uva o pergamino (se calcula de las líneas)
     Fecha fecha;
     std::string hora;
     long clienteId = 0;
     std::string clienteNombre;
     std::string clienteDni;
     std::vector<LineaFactura> lineas;
+    std::string numeroTexto() const { return numeroFactura(categoria, numero); }
     Centavos total = 0;
     Centavos pagado = 0;  // lo que se pagó en efectivo al momento
     Centavos saldo = 0;   // lo que el beneficio queda debiendo
@@ -77,11 +87,27 @@ std::string validarFactura(const Factura& f);
 // Fila plana para el reporte de compras (una por línea de comprobante).
 struct FilaCompra {
     long numero = 0;
+    int categoria = CATEGORIA_PERGAMINO;
     Fecha fecha;
     std::string clienteNombre;
     std::string clienteDni;
     LineaFactura linea;
 };
+
+// Libras compradas en un día (o un período), por tipo de café.
+struct ResumenDia {
+    Fecha fecha;
+    double libras[NUM_TIPOS_CAFE + 1] = {0, 0, 0, 0};
+    Centavos monto[NUM_TIPOS_CAFE + 1] = {0, 0, 0, 0};
+    int comprobantesUva = 0;
+    int comprobantesPergamino = 0;
+    double librasPergamino() const { return libras[CAFE_HUMEDO] + libras[CAFE_SECO]; }
+};
+// Agrupa las líneas de compra por día (en orden de fecha).
+std::vector<ResumenDia> resumirPorDia(const std::vector<FilaCompra>& filas);
+ResumenDia sumarResumenes(const std::vector<ResumenDia>& dias);
+// Inicio de la cosecha cafetalera (1 de octubre) que contiene la fecha.
+Fecha inicioCosecha(const Fecha& f);
 
 // ---------------------------------------------------------------- Ventas
 struct Venta {

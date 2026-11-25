@@ -1,6 +1,7 @@
 #include "win/Paginas.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "win/App.h"
 
@@ -38,6 +39,80 @@ void Pagina::colorTexto(int id, COLORREF color) {
     InvalidateRect(GetDlgItem(h_, id), nullptr, TRUE);
 }
 
+namespace {
+HFONT letraEscalada(LOGFONTW lf, double escala) {
+    // Las letras se crean una vez por tamaño y se reutilizan.
+    static std::vector<std::pair<std::wstring, HFONT>> cache;
+    lf.lfHeight = static_cast<LONG>(lf.lfHeight * escala + (lf.lfHeight < 0 ? -0.5 : 0.5));
+    if (lf.lfHeight == 0) lf.lfHeight = -1;
+    const std::wstring clave = std::wstring(lf.lfFaceName) + L"|" + std::to_wstring(lf.lfHeight) + L"|" +
+                               std::to_wstring(lf.lfWeight) + L"|" + std::to_wstring(lf.lfItalic);
+    for (const auto& c : cache)
+        if (c.first == clave) return c.second;
+    HFONT f = CreateFontIndirectW(&lf);
+    cache.push_back({clave, f});
+    return f;
+}
+
+}  // namespace
+
+void Pagina::guardarDiseno() {
+    RECT rc;
+    GetClientRect(h_, &rc);
+    tamanoDiseno_ = {rc.right, rc.bottom};
+    originales_.clear();
+    for (HWND c = GetWindow(h_, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT)) {
+        Original o{};
+        o.control = c;
+        GetWindowRect(c, &o.rect);
+        MapWindowPoints(nullptr, h_, reinterpret_cast<POINT*>(&o.rect), 2);
+        wchar_t clase[32] = {0};
+        GetClassNameW(c, clase, 31);
+        o.combo = _wcsicmp(clase, L"ComboBox") == 0;
+        HFONT f = reinterpret_cast<HFONT>(SendMessageW(c, WM_GETFONT, 0, 0));
+        o.tieneLetra = f && GetObjectW(f, sizeof o.letra, &o.letra) > 0;
+        // Botones en negrita para que se vean mejor.
+        if (o.tieneLetra && _wcsicmp(clase, L"Button") == 0) {
+            const LONG estilo = GetWindowLongW(c, GWL_STYLE) & BS_TYPEMASK;
+            if (estilo == BS_PUSHBUTTON || estilo == BS_DEFPUSHBUTTON) {
+                o.letra.lfWeight = FW_BOLD;
+                SendMessageW(c, WM_SETFONT, reinterpret_cast<WPARAM>(letraEscalada(o.letra, 1.0)), TRUE);
+            }
+        }
+        originales_.push_back(o);
+    }
+}
+
+void Pagina::escalar(int ancho, int alto) {
+    if (tamanoDiseno_.cx <= 0 || tamanoDiseno_.cy <= 0 || originales_.empty()) return;
+    double e = std::min(static_cast<double>(ancho) / tamanoDiseno_.cx, static_cast<double>(alto) / tamanoDiseno_.cy);
+    e = std::max(0.85, std::min(e, 2.2));
+    if (std::abs(e - escalaActual_) < 0.01) return;
+    const double cambio = e / escalaActual_;
+    HDWP posiciones = BeginDeferWindowPos(static_cast<int>(originales_.size()));
+    for (const auto& o : originales_) {
+        const int x = static_cast<int>(o.rect.left * e), y = static_cast<int>(o.rect.top * e);
+        const int w = static_cast<int>((o.rect.right - o.rect.left) * e);
+        int h = static_cast<int>((o.rect.bottom - o.rect.top) * e);
+        if (o.combo) h += static_cast<int>(200 * e);  // alto de la lista desplegable
+        if (posiciones)
+            posiciones = DeferWindowPos(posiciones, o.control, nullptr, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
+        if (o.tieneLetra) SendMessageW(o.control, WM_SETFONT, reinterpret_cast<WPARAM>(letraEscalada(o.letra, e)), FALSE);
+        // Columnas de las tablas en proporción.
+        wchar_t clase[32] = {0};
+        GetClassNameW(o.control, clase, 31);
+        if (std::wstring(clase) == WC_LISTVIEWW) {
+            HWND encabezado = ListView_GetHeader(o.control);
+            const int columnas = encabezado ? Header_GetItemCount(encabezado) : 0;
+            for (int i = 0; i < columnas; ++i)
+                ListView_SetColumnWidth(o.control, i, static_cast<int>(ListView_GetColumnWidth(o.control, i) * cambio));
+        }
+    }
+    if (posiciones) EndDeferWindowPos(posiciones);
+    escalaActual_ = e;
+    InvalidateRect(h_, nullptr, TRUE);
+}
+
 void Pagina::alRedimensionar(int ancho, int alto) {
     if (controlEstirable_) estirar(controlEstirable_, ancho, alto, true, true);
 }
@@ -65,6 +140,7 @@ INT_PTR CALLBACK Pagina::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             self->h_ = h;
             intentar(h, [&] { self->alIniciar(); });
             intentar(h, [&] { self->aplicarMarcaAgua(App::instancia().marcaAgua()); });
+            self->guardarDiseno();
             return FALSE;
         case WM_COMMAND: {
             if (!self) return FALSE;
@@ -90,7 +166,10 @@ INT_PTR CALLBACK Pagina::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return FALSE;
         }
         case WM_SIZE:
-            if (self) self->alRedimensionar(LOWORD(lp), HIWORD(lp));
+            if (self) {
+                self->escalar(LOWORD(lp), HIWORD(lp));
+                self->alRedimensionar(LOWORD(lp), HIWORD(lp));
+            }
             return TRUE;
         case WM_CTLCOLORSTATIC: {
             if (!self) return FALSE;

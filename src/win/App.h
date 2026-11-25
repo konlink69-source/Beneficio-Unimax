@@ -66,8 +66,19 @@ public:
     // Imagen nueva para el fondo de una tabla (la tabla se queda con ella).
     HBITMAP marcaAguaParaLista(int marca);
     std::wstring rutaMarcaAguaPng(int marca) const;
+    // Logo muy tenue sobre blanco, del tamaño indicado (para el fondo de una tabla).
+    HBITMAP logoTenue(int ancho, int alto);
     // Avisa a la ventana principal para que actualice las tablas.
     void refrescarMarcaAgua();
+
+    // ------------------------------------------------ Alerta de caja baja
+    Centavos minimoCaja();
+    // Recalcula el dinero en caja de hoy (para el encabezado) y devuelve true si está bajo el mínimo.
+    bool actualizarCaja();
+    bool cajaBaja() const { return cajaBaja_; }
+    Centavos saldoCaja() const { return saldoCaja_; }
+    // Después de un pago: muestra la alerta si la caja quedó bajo el mínimo.
+    void avisarCajaBaja(HWND padre);
 
     HINSTANCE hInst = nullptr;
     HWND ventana = nullptr;
@@ -80,6 +91,8 @@ private:
     db::Conexion conexion_;
     std::unique_ptr<Repositorio> repo_;
     Usuario usuario_;
+    bool cajaBaja_ = false;
+    Centavos saldoCaja_ = 0;
 };
 
 inline Repositorio& repo() { return App::instancia().repo(); }
