@@ -35,6 +35,19 @@ public:
     virtual void alRedimensionar(int ancho, int alto);
     // ¿Hay algo a medio hacer (por ejemplo, un comprobante sin guardar)? Se revisa antes de actualizar.
     virtual bool trabajoSinGuardar() const { return false; }
+    // Dibujo propio (por ejemplo, el panel de inicio). Devuelve true si dibujó.
+    virtual bool alPintar(HDC dc, const RECT& area) {
+        (void)dc;
+        (void)area;
+        return false;
+    }
+    // Ratón sobre la pestaña (WM_MOUSEMOVE, WM_LBUTTONUP, WM_SETCURSOR). Devuelve true si lo atendió.
+    virtual bool alRaton(UINT msg, int x, int y) {
+        (void)msg;
+        (void)x;
+        (void)y;
+        return false;
+    }
     // Pone (o quita) la marca de agua en la tabla principal de la pestaña.
     void aplicarMarcaAgua(int marca);
 
@@ -67,6 +80,7 @@ private:
     static INT_PTR CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp);
 };
 
+std::unique_ptr<Pagina> crearPaginaInicio();
 std::unique_ptr<Pagina> crearPaginaFactura();
 std::unique_ptr<Pagina> crearPaginaFacturas();
 std::unique_ptr<Pagina> crearPaginaClientes();

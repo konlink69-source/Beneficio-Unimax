@@ -9,11 +9,17 @@ deudas con clientes y productores, caja diaria y ventas. Usa una base de datos *
 
 ---
 
-## 1. Qué hace el programa (una pestaña por tarea)
+## 1. Qué hace el programa (una sección por tarea)
 
-| Pestaña | Para qué sirve |
+La ventana tiene una **barra café** arriba (logo, nombre de la sección, alertas, fecha y el usuario) y un
+**menú lateral** a la izquierda con las secciones. El menú completo (Archivo, Sesión, Ver, Nube y Ayuda) se
+abre haciendo clic en el **nombre del usuario**, arriba a la derecha. Abajo del menú lateral se ve el estado de
+**Google Drive**.
+
+| Sección | Para qué sirve |
 |---|---|
 | **Ingreso** | Al abrir, el programa pide **usuario y contraseña** (ver la sección 3). |
+| **Inicio** | Panel con el resumen: café **uva** y **pergamino** comprado hoy (libras, quintales, lempiras, mes y cosecha), **dinero en caja** (en rojo si está bajo el mínimo), **deudas** (lo que nos deben y lo que debemos), gráfico de **compras por mes** de la cosecha, anillo con el reparto **por tipo de café**, **deudas que vencen pronto** y **mejores productores del mes**. Al hacer clic en una tarjeta se abre la sección correspondiente. |
 | **Comprobante de compra** | Se escribe el DNI del productor (si ya existe, aparece su nombre; si no, se registra al guardar). Se agregan líneas de café pesado: tipo, peso en **libras o quintales**, **galones** (como dato) y precio por libra. El programa calcula los subtotales, el total, lo **pagado en efectivo** y el **saldo** que queda debiendo el beneficio, con una fecha de pago opcional. En el campo DNI también se puede escribir el **nombre** y presionar Enter para buscarlo. **Guardar e imprimir** manda el comprobante directo a la impresora; **Guardar** lo muestra dentro del programa. |
 | **Informe del día** | Botón en *Comprobante de compra* (y en *Reportes* y el menú *Ver*): libras y quintales de **uva**, **pergamino húmedo** y **pergamino seco** por separado, del día, del mes y de la cosecha (desde el 1 de octubre). Se ve dentro del programa y se imprime. El **reporte general** (Excel) tiene una fila por día de la cosecha y se vuelve a crear con los datos al día. |
 | **Facturas** | Una **carpeta por cliente** con todos sus comprobantes. Doble clic para **verlo dentro del programa** (sin Excel), imprimirlo, abrir su PDF o **anular** (devuelve el pago a la caja y anula el saldo pendiente). |
@@ -345,7 +351,7 @@ src/db/     ODBC (Access en Windows, SQLite en las pruebas), creación de tablas
             (todas las operaciones del negocio, con transacciones).
 src/win/    Interfaz Win32: ventana con pestañas, diálogos (app.rc), Excel por COM, avisos,
             Google Drive (WinHTTP + OAuth con PKCE), sincronización (Nube) y actualizaciones.
-tests/      Pruebas automáticas (387 comprobaciones).
+tests/      Pruebas automáticas (404 comprobaciones).
 plantillas/ Plantillas de Excel.
 tools/      Generadores del logo y de las plantillas, verificación de plantillas.
 logo/       Logo en SVG y PNG.

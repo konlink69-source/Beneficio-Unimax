@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "win/App.h"
+#include "win/Tema.h"
 #include "win/resource.h"
 
 namespace bu::win {
@@ -43,7 +44,7 @@ public:
     bool cancelado() const override { return cancelar.load(); }
 };
 
-INT_PTR CALLBACK procProgreso(HWND h, UINT msg, WPARAM, LPARAM lp) {
+INT_PTR CALLBACK procProgreso(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     auto* a = reinterpret_cast<AvanceVentana*>(GetWindowLongPtrW(h, DWLP_USER));
     switch (msg) {
         case WM_INITDIALOG: {
@@ -56,6 +57,8 @@ INT_PTR CALLBACK procProgreso(HWND h, UINT msg, WPARAM, LPARAM lp) {
             SetWindowLongPtrW(barra, GWL_STYLE, GetWindowLongPtrW(barra, GWL_STYLE) | PBS_MARQUEE);
             SendMessageW(barra, PBM_SETMARQUEE, TRUE, 30);
             ShowWindow(GetDlgItem(h, IDCANCEL), a->cancelable ? SW_SHOW : SW_HIDE);
+            tema::usarFondo(h, tema::TARJETA);
+            tema::preparar(h);
             std::thread([a] {
                 try {
                     a->trabajo(*a);
@@ -94,8 +97,20 @@ INT_PTR CALLBACK procProgreso(HWND h, UINT msg, WPARAM, LPARAM lp) {
             return TRUE;
         }
         case WM_TAREA_FIN:
+            tema::olvidar(h);
             EndDialog(h, IDOK);
             return TRUE;
+        case WM_ERASEBKGND:
+            if (tema::pintarFondo(h, reinterpret_cast<HDC>(wp))) {
+                SetWindowLongPtrW(h, DWLP_MSGRESULT, TRUE);
+                return TRUE;
+            }
+            return FALSE;
+        case WM_CTLCOLORDLG:
+        case WM_CTLCOLORSTATIC:
+            return tema::colorControl(h, msg, reinterpret_cast<HDC>(wp), reinterpret_cast<HWND>(lp), tema::TEXTO);
+        case WM_DRAWITEM:
+            return tema::dibujarBoton(reinterpret_cast<const DRAWITEMSTRUCT*>(lp)) ? TRUE : FALSE;
         case WM_CLOSE:
             return TRUE;  // no se cierra con la X: se usa Cancelar
         default:

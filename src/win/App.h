@@ -34,6 +34,7 @@ enum IndicePagina {
     PAG_VENTAS,
     PAG_REPORTES,
     PAG_CONFIG,
+    PAG_INICIO,  // panel con el resumen del día (se muestra al abrir)
     NUM_PAGINAS
 };
 

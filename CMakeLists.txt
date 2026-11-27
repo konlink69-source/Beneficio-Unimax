@@ -23,6 +23,7 @@ add_library(bu_nucleo STATIC
     src/core/Grafico.cpp
     src/core/Json.cpp
     src/core/Sincronizacion.cpp
+    src/core/Panel.cpp
     src/db/Odbc.cpp
     src/db/Esquema.cpp
     src/db/Repositorio.cpp
@@ -70,6 +71,8 @@ if(WIN32)
         src/win/Sesion.cpp
         src/win/Dialogos.cpp
         src/win/Paginas.cpp
+        src/win/PaginaInicio.cpp
+        src/win/Tema.cpp
         src/win/PaginaFactura.cpp
         src/win/PaginaFacturas.cpp
         src/win/PaginaClientes.cpp
@@ -81,7 +84,7 @@ if(WIN32)
         src/win/PaginaConfiguracion.cpp
         src/win/app.rc
     )
-    target_link_libraries(BeneficioUnimax PRIVATE bu_nucleo comctl32 ole32 oleaut32 uuid shell32 shlwapi advapi32 bcrypt winspool gdi32 comdlg32 winhttp ws2_32 crypt32)
+    target_link_libraries(BeneficioUnimax PRIVATE bu_nucleo comctl32 ole32 oleaut32 uuid shell32 shlwapi advapi32 bcrypt winspool gdi32 comdlg32 winhttp ws2_32 crypt32 gdiplus uxtheme)
     # Versión (la pone GitHub Actions) y datos de la aplicación de Google (secretos del repositorio).
     set(BU_VERSION "0" CACHE STRING "Número de versión del programa")
     set(BU_GOOGLE_CLIENT_ID "$ENV{BU_GOOGLE_CLIENT_ID}" CACHE STRING "ID de cliente de Google (OAuth, Escritorio)")

@@ -5,6 +5,7 @@
 #include "win/App.h"
 #include "win/Excel.h"
 #include "win/Sesion.h"
+#include "win/Tema.h"
 #include "win/resource.h"
 
 namespace bu::win {
@@ -25,6 +26,7 @@ INT_PTR CALLBACK DialogoModal::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             SetWindowLongPtrW(h, DWLP_USER, lp);
             self->h_ = h;
             self->alIniciar();
+            tema::preparar(h);
             {
                 // Si alIniciar ya puso el foco en un campo, se respeta (FALSE); si no, Windows elige.
                 HWND foco = GetFocus();
@@ -54,8 +56,23 @@ INT_PTR CALLBACK DialogoModal::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         }
         case WM_CTLCOLORDLG:
         case WM_CTLCOLORSTATIC:
-        case WM_CTLCOLORBTN:
-            return self ? self->alColor(msg, reinterpret_cast<HDC>(wp), reinterpret_cast<HWND>(lp)) : FALSE;
+        case WM_CTLCOLORBTN: {
+            if (!self) return FALSE;
+            const INT_PTR propio = self->alColor(msg, reinterpret_cast<HDC>(wp), reinterpret_cast<HWND>(lp));
+            if (propio) return propio;
+            return tema::colorControl(h, msg, reinterpret_cast<HDC>(wp), reinterpret_cast<HWND>(lp), tema::TEXTO);
+        }
+        case WM_ERASEBKGND:
+            if (tema::pintarFondo(h, reinterpret_cast<HDC>(wp))) {
+                SetWindowLongPtrW(h, DWLP_MSGRESULT, TRUE);
+                return TRUE;
+            }
+            return FALSE;
+        case WM_DRAWITEM:
+            return tema::dibujarBoton(reinterpret_cast<const DRAWITEMSTRUCT*>(lp)) ? TRUE : FALSE;
+        case WM_DESTROY:
+            tema::olvidar(h);
+            return FALSE;
         default:
             return FALSE;
     }

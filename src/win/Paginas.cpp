@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "win/App.h"
+#include "win/Tema.h"
 
 namespace bu::win {
 
@@ -141,7 +142,58 @@ INT_PTR CALLBACK Pagina::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             intentar(h, [&] { self->alIniciar(); });
             intentar(h, [&] { self->aplicarMarcaAgua(App::instancia().marcaAgua()); });
             self->guardarDiseno();
+            tema::preparar(h);
             return FALSE;
+        case WM_ERASEBKGND:
+            if (tema::pintarFondo(h, reinterpret_cast<HDC>(wp))) {
+                SetWindowLongPtrW(h, DWLP_MSGRESULT, TRUE);
+                return TRUE;
+            }
+            return FALSE;
+        case WM_PAINT: {
+            if (!self) return FALSE;
+            PAINTSTRUCT ps;
+            HDC dc = BeginPaint(h, &ps);
+            RECT r;
+            GetClientRect(h, &r);
+            // Doble búfer: el dibujo propio se hace en memoria y se copia de una vez.
+            HDC mem = CreateCompatibleDC(dc);
+            HBITMAP bmp = CreateCompatibleBitmap(dc, std::max(1L, r.right), std::max(1L, r.bottom));
+            HGDIOBJ anterior = SelectObject(mem, bmp);
+            FillRect(mem, &r, tema::pincel(tema::fondoDe(h)));
+            bool dibujo = false;
+            intentar(h, [&] { dibujo = self->alPintar(mem, r); });
+            if (dibujo) BitBlt(dc, 0, 0, r.right, r.bottom, mem, 0, 0, SRCCOPY);
+            SelectObject(mem, anterior);
+            DeleteObject(bmp);
+            DeleteDC(mem);
+            EndPaint(h, &ps);
+            return TRUE;
+        }
+        case WM_MOUSEMOVE:
+        case WM_MOUSELEAVE:
+        case WM_LBUTTONUP:
+            if (self) {
+                bool atendido = false;
+                intentar(h, [&] {
+                    atendido = self->alRaton(msg, static_cast<short>(LOWORD(lp)), static_cast<short>(HIWORD(lp)));
+                });
+                return atendido ? TRUE : FALSE;
+            }
+            return FALSE;
+        case WM_SETCURSOR:
+            if (self && reinterpret_cast<HWND>(wp) == h && LOWORD(lp) == HTCLIENT) {
+                POINT p;
+                GetCursorPos(&p);
+                ScreenToClient(h, &p);
+                if (self->alRaton(WM_SETCURSOR, p.x, p.y)) {
+                    SetWindowLongPtrW(h, DWLP_MSGRESULT, TRUE);
+                    return TRUE;
+                }
+            }
+            return FALSE;
+        case WM_DRAWITEM:
+            return tema::dibujarBoton(reinterpret_cast<const DRAWITEMSTRUCT*>(lp)) ? TRUE : FALSE;
         case WM_COMMAND: {
             if (!self) return FALSE;
             const int id = LOWORD(wp);
@@ -171,14 +223,13 @@ INT_PTR CALLBACK Pagina::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 self->alRedimensionar(LOWORD(lp), HIWORD(lp));
             }
             return TRUE;
+        case WM_CTLCOLORDLG:
+        case WM_CTLCOLORBTN:
         case WM_CTLCOLORSTATIC: {
             if (!self) return FALSE;
             const auto it = self->coloresTexto_.find(GetDlgCtrlID(reinterpret_cast<HWND>(lp)));
-            if (it == self->coloresTexto_.end()) return FALSE;
-            HDC dc = reinterpret_cast<HDC>(wp);
-            SetTextColor(dc, it->second);
-            SetBkColor(dc, GetSysColor(COLOR_BTNFACE));
-            return reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_BTNFACE));
+            const COLORREF color = it == self->coloresTexto_.end() ? tema::TEXTO : it->second;
+            return tema::colorControl(h, msg, reinterpret_cast<HDC>(wp), reinterpret_cast<HWND>(lp), color);
         }
         default:
             return FALSE;

@@ -6,6 +6,7 @@
 #include "core/Texto.h"
 #include "win/App.h"
 #include "win/Dialogos.h"
+#include "win/Tema.h"
 #include "win/resource.h"
 
 namespace bu::win {
@@ -117,6 +118,7 @@ public:
 
 protected:
     void alIniciar() override {
+        tema::usarFondo(h_, CREMA);
         ponerLogo(h_, IDC_L_LOGO);
         ponerFuente(h_, IDC_L_USUARIO, fuente(tamanoLetra() * 11.0 / 9.0, false));
         ponerFuente(h_, IDC_L_CLAVE, fuente(tamanoLetra() * 11.0 / 9.0, false));

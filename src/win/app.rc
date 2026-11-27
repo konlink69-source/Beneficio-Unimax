@@ -98,6 +98,12 @@ END
 #define NUM ES_AUTOHSCROLL | ES_RIGHT
 
 // =====================================================================  Comprobante de compra
+IDD_PAG_INICIO DIALOGEX 0, 0, 560, 298
+STYLE ESTILO_PAGINA
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+END
+
 IDD_PAG_FACTURA DIALOGEX 0, 0, 560, 298
 STYLE ESTILO_PAGINA
 FONT 9, "Segoe UI", 400, 0, 0x1

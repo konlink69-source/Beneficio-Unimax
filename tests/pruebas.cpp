@@ -16,6 +16,7 @@
 #include "core/Seguridad.h"
 #include "core/Json.h"
 #include "core/Sincronizacion.h"
+#include "core/Panel.h"
 #include "core/Identificacion.h"
 #include "core/NumeroLetras.h"
 #include "core/Texto.h"
@@ -366,6 +367,46 @@ static void pruebasSincronizacion() {
     // Ejemplo del RFC 7636 (apéndice B).
     CHECK_EQ(desafioPkce("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
              std::string("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"));
+}
+
+static void pruebasPanel() {
+    const Fecha hoy(2026, 11, 27);
+    auto fila = [](Fecha f, const char* nombre, int tipo, double lb, Centavos monto) {
+        FilaCompra c;
+        c.fecha = f;
+        c.clienteNombre = nombre;
+        c.clienteDni = std::string("0801-") + nombre;
+        c.categoria = tipo == CAFE_UVA ? CATEGORIA_UVA : CATEGORIA_PERGAMINO;
+        c.linea.tipoCafe = tipo;
+        c.linea.libras = lb;
+        c.linea.subtotal = monto;
+        return c;
+    };
+    std::vector<FilaCompra> filas = {
+        fila(Fecha(2026, 10, 5), "Ana", CAFE_UVA, 1000, 850000),
+        fila(Fecha(2026, 11, 3), "Ana", CAFE_SECO, 200, 920000),
+        fila(Fecha(2026, 11, 27), "Beto", CAFE_UVA, 300, 255000),
+        fila(Fecha(2026, 11, 27), "Carla", CAFE_HUMEDO, 150.5, 120000),
+        fila(Fecha(2026, 9, 30), "Viejo", CAFE_UVA, 999, 1),  // cosecha anterior: no cuenta
+    };
+    const DatosPanel d = calcularPanel(filas, hoy);
+    CHECK(d.inicioCosecha == Fecha(2026, 10, 1));
+    CHECK_EQ(d.mesActual, 1);
+    CHECK_EQ(d.montoUva[0], static_cast<Centavos>(850000));
+    CHECK_EQ(d.montoUva[1], static_cast<Centavos>(255000));
+    CHECK_EQ(d.montoPergamino[1], static_cast<Centavos>(1040000));
+    CHECK_EQ(d.deHoy.libras[CAFE_UVA], 300.0);
+    CHECK_EQ(d.deHoy.librasPergamino(), 150.5);
+    CHECK_EQ(d.delMes.libras[CAFE_SECO], 200.0);
+    CHECK_EQ(d.mejoresDelMes.size(), static_cast<size_t>(3));
+    CHECK_EQ(d.mejoresDelMes[0].nombre, std::string("Ana"));
+    CHECK_EQ(std::string(mesCosecha(0)), std::string("Oct"));
+    CHECK_EQ(std::string(mesCosecha(11)), std::string("Sep"));
+    CHECK_EQ(montoCorto(95000), std::string("L 950"));
+    CHECK_EQ(montoCorto(5850000), std::string("L 58.5 mil"));
+    CHECK_EQ(montoCorto(125000000), std::string("L 1.25 M"));
+    CHECK_EQ(formatoLibras(3250), std::string("3,250 lb"));
+    CHECK_EQ(formatoLibras(1475.5), std::string("1,475.5 lb"));
 }
 
 static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
@@ -817,6 +858,7 @@ int main(int argc, char** argv) {
     pruebasTextoYModelos();
     pruebasSeguridad();
     pruebasSincronizacion();
+    pruebasPanel();
     try {
         if (ejecutarPruebasBD() != 0) return 1;
     } catch (const std::exception& e) {
