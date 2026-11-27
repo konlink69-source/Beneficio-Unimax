@@ -37,10 +37,20 @@ void usarFondo(HWND dlg, COLORREF color);
 COLORREF fondoDe(HWND dlg);
 // La ventana se cerró: olvida sus datos.
 void olvidar(HWND dlg);
+// Logo del beneficio tenue de fondo (las pestañas lo usan; los diálogos no).
+void usarLogo(HWND dlg, bool si);
+// Vuelve a dibujar el fondo (tarjetas, logo) y el de las tablas. Llamar después de mover o
+// mostrar/ocultar controles (al cambiar el tamaño se hace solo en las pestañas).
+void refrescar(HWND dlg);
+// Campo de búsqueda: lleva una lupa a la izquierda.
+void campoBusqueda(HWND edit);
+// Dibuja el logo tenue centrado en "area" (para pantallas con dibujo propio, como el Inicio).
+void logoMarca(HDC dc, const RECT& area);
+constexpr COLORREF CAMPO = RGB(250, 247, 242);  // relleno de los campos de texto
 
 // Manejo de mensajes. Devuelven true si atendieron el mensaje.
 bool pintarFondo(HWND dlg, HDC dc);                       // WM_ERASEBKGND
-INT_PTR colorControl(HWND dlg, UINT msg, HDC dc, HWND control, COLORREF texto);  // WM_CTLCOLOR*
+INT_PTR colorControl(HWND dlg, UINT msg, HDC dc, HWND control, COLORREF texto);  // WM_CTLCOLOR* (también EDIT)
 bool dibujarBoton(const DRAWITEMSTRUCT* d);                // WM_DRAWITEM
 
 // ---- Dibujo (suavizado con GDI+)

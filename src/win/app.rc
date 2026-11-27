@@ -109,14 +109,11 @@ STYLE ESTILO_PAGINA
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
     GROUPBOX        "1. Cliente (productor que vende el café)", IDC_STATIC, 6, 2, 548, 46
-    LTEXT           "DNI:", IDC_F_LBL_DNI, 12, 16, 26, 12
-    EDITTEXT        IDC_F_DNI, 40, 14, 92, 15, ES_AUTOHSCROLL
-    PUSHBUTTON      "Buscar por nombre...", IDC_F_BUSCAR, 135, 13, 76, 17
-    LTEXT           "Nombre:", IDC_F_LBL_NOMBRE, 216, 16, 42, 12
-    EDITTEXT        IDC_F_NOMBRE, 260, 14, 150, 15, ES_AUTOHSCROLL
-    LTEXT           "Teléfono:", IDC_F_LBL_TEL, 414, 16, 50, 12
-    EDITTEXT        IDC_F_TELEFONO, 466, 14, 80, 15, ES_AUTOHSCROLL
-    LTEXT           "", IDC_F_INFO, 14, 34, 532, 9
+    EDITTEXT        IDC_F_BUSCA, 14, 18, 214, 19, ES_AUTOHSCROLL
+    LTEXT           "", IDC_F_CLI_NOMBRE, 240, 15, 250, 14
+    LTEXT           "", IDC_F_CLI_DATOS, 240, 31, 200, 10
+    RTEXT           "", IDC_F_CLI_DEUDA, 440, 31, 108, 10
+    PUSHBUTTON      "Cambiar", IDC_F_CLI_QUITAR, 496, 13, 52, 15
 
     LTEXT           "Comprobante No.:", IDC_STATIC, 8, 57, 62, 8
     LTEXT           "", IDC_F_NUMERO, 72, 55, 118, 11
@@ -164,23 +161,19 @@ IDD_PAG_FACTURAS DIALOGEX 0, 0, 560, 298
 STYLE ESTILO_PAGINA
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
-    LTEXT           "Desde:", IDC_STATIC, 8, 9, 24, 8
-    CONTROL         "", IDC_H_DESDE, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 34, 6, 66, 14
-    LTEXT           "Hasta:", IDC_STATIC, 106, 9, 22, 8
-    CONTROL         "", IDC_H_HASTA, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 130, 6, 66, 14
-    PUSHBUTTON      "Hoy", IDC_H_HOY, 200, 5, 30, 16
-    PUSHBUTTON      "Este mes", IDC_H_MES, 232, 5, 40, 16
-    LTEXT           "Buscar cliente:", IDC_STATIC, 280, 9, 54, 8
-    EDITTEXT        IDC_H_FILTRO, 336, 6, 150, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "Actualizar", IDC_H_BUSCAR, 490, 5, 56, 16
-    PUSHBUTTON      "Ver comprobante", IDC_H_VER, 6, 26, 72, 17
-    PUSHBUTTON      "Imprimir", IDC_H_IMPRIMIR, 82, 26, 50, 17
-    PUSHBUTTON      "Abrir PDF", IDC_H_EXCEL, 136, 26, 50, 17
-    PUSHBUTTON      "Abrir carpeta del cliente", IDC_H_CARPETA, 190, 26, 96, 17
-    PUSHBUTTON      "Anular comprobante...", IDC_H_ANULAR, 290, 26, 86, 17
+    EDITTEXT        IDC_H_FILTRO, 6, 4, 236, 19, ES_AUTOHSCROLL
+    COMBOBOX        IDC_H_PERIODO, 250, 6, 108, 120, COMBO
+    CONTROL         "", IDC_H_DESDE, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 366, 6, 72, 16
+    CTEXT           "a", IDC_H_LBL_A, 440, 9, 12, 8
+    CONTROL         "", IDC_H_HASTA, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 454, 6, 72, 16
+    PUSHBUTTON      "Ver comprobante", IDC_H_VER, 6, 28, 72, 17
+    PUSHBUTTON      "Imprimir", IDC_H_IMPRIMIR, 82, 28, 50, 17
+    PUSHBUTTON      "Abrir PDF", IDC_H_EXCEL, 136, 28, 50, 17
+    PUSHBUTTON      "Abrir carpeta del cliente", IDC_H_CARPETA, 190, 28, 96, 17
+    PUSHBUTTON      "Anular comprobante...", IDC_H_ANULAR, 290, 28, 86, 17
     LTEXT           "", IDC_H_RESUMEN, 6, 48, 548, 9
-    LTEXT           "Carpetas (una por cliente):", IDC_STATIC, 6, 60, 176, 8
-    LTEXT           "Comprobantes de la carpeta (doble clic para verlo):", IDC_STATIC, 188, 60, 300, 8
+    LTEXT           "Clientes", IDC_STATIC, 6, 60, 176, 8
+    LTEXT           "Comprobantes (doble clic para verlo)", IDC_STATIC, 188, 60, 300, 8
     CONTROL         "", IDC_H_CLIENTES, "SysListView32", LISTA, 6, 70, 176, 222
     CONTROL         "", IDC_H_LISTA, "SysListView32", LISTA, 188, 70, 366, 222
 END
@@ -701,4 +694,26 @@ BEGIN
     LTEXT           "Antes de actualizar se guarda un respaldo (en Google Drive si está conectado). Sus datos, facturas y plantillas no cambian.", IDC_STATIC, 10, 176, 310, 18
     DEFPUSHBUTTON   "Actualizar ahora", IDOK, 196, 198, 70, 16
     PUSHBUTTON      "Más tarde", IDCANCEL, 270, 198, 50, 16
+END
+
+IDD_CLIENTE_NUEVO DIALOGEX 0, 0, 300, 196
+STYLE ESTILO_MODAL
+CAPTION "Registrar cliente nuevo"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nombre completo:", IDC_STATIC, 10, 12, 70, 8
+    EDITTEXT        IDC_CN_NOMBRE, 84, 9, 206, 16, ES_AUTOHSCROLL
+    LTEXT           "DNI:", IDC_STATIC, 10, 34, 70, 8
+    EDITTEXT        IDC_CN_DNI, 84, 31, 110, 16, ES_AUTOHSCROLL
+    LTEXT           "Teléfono:", IDC_STATIC, 10, 56, 70, 8
+    EDITTEXT        IDC_CN_TEL, 84, 53, 110, 16, ES_AUTOHSCROLL
+    LTEXT           "RTN (opcional):", IDC_STATIC, 10, 78, 70, 8
+    EDITTEXT        IDC_CN_RTN, 84, 75, 110, 16, ES_AUTOHSCROLL
+    LTEXT           "Carnet IHCAFE (opcional):", IDC_STATIC, 10, 100, 72, 16
+    EDITTEXT        IDC_CN_CARNET, 84, 97, 110, 16, ES_AUTOHSCROLL
+    LTEXT           "Dirección (opcional):", IDC_STATIC, 10, 122, 72, 8
+    EDITTEXT        IDC_CN_DIR, 84, 119, 206, 16, ES_AUTOHSCROLL
+    LTEXT           "", IDC_CN_INFO, 10, 142, 280, 18
+    DEFPUSHBUTTON   "Guardar y elegir", IDOK, 166, 170, 70, 18
+    PUSHBUTTON      "Cancelar", IDCANCEL, 240, 170, 50, 18
 END

@@ -3,6 +3,7 @@
 
 #include "core/Documentos.h"
 #include "win/App.h"
+#include "win/Buscador.h"
 #include "win/Dialogos.h"
 #include "win/Excel.h"
 #include "win/Impresion.h"
@@ -20,7 +21,9 @@ public:
     const wchar_t* titulo() const override { return L"Comprobante de compra"; }
 
     void alIniciar() override {
-        cliente_.configurar(h_, IDC_F_DNI, IDC_F_NOMBRE, IDC_F_TELEFONO, IDC_F_INFO, CLIENTE_PRODUCTOR);
+        cliente_.configurar(
+            h_, IDC_F_BUSCA, IDC_F_CLI_NOMBRE, IDC_F_CLI_DATOS, IDC_F_CLI_DEUDA, IDC_F_CLI_QUITAR,
+            [this](int id, COLORREF c) { colorTexto(id, c); }, [this] { enfocar(h_, IDC_F_CANTIDAD); });
         configurarFecha(h_, IDC_F_FECHA);
         configurarFecha(h_, IDC_F_VENCE);
         for (int t = 1; t <= NUM_TIPOS_CAFE; ++t) comboAgregar(h_, IDC_F_TIPO, nombreTipoCafe(t), t);
@@ -36,14 +39,6 @@ public:
                       {L"Precio por libra", 70, true},
                       {L"Precio por quintal", 74, true},
                       {L"Subtotal", 84, true}});
-        // Etiquetas del cliente grandes y en café; los campos con letra más grande.
-        for (int id : {IDC_F_LBL_DNI, IDC_F_LBL_NOMBRE, IDC_F_LBL_TEL}) {
-            ponerFuente(h_, id, fuenteEtiqueta());
-            colorTexto(id, COLOR_CAFE);
-        }
-        for (int id : {IDC_F_DNI, IDC_F_NOMBRE, IDC_F_TELEFONO}) ponerFuente(h_, id, fuente(tamanoLetra() * 11.0 / 9.0, false));
-        textoGuia(h_, IDC_F_DNI, L"DNI o nombre + Enter");
-        textoGuia(h_, IDC_F_NOMBRE, L"Nombre completo (o Enter para buscar)");
         ponerFuente(h_, IDC_F_TOTAL, fuenteGrande());
         ponerFuente(h_, IDC_F_NUMERO, fuenteNegrita());
         ponerFuente(h_, IDC_F_SUBTOTAL, fuenteNegrita());
@@ -55,34 +50,14 @@ public:
     }
 
     void alMostrar() override {
+        cliente_.recargar();
         actualizarNumero();
         cargarPrecios(false);
-    }
-
-    // El logo del beneficio, tenue, al centro de la tabla de líneas (marca de agua de la pestaña).
-    void alRedimensionar(int ancho, int alto) override {
-        Pagina::alRedimensionar(ancho, alto);
-        HWND lista = GetDlgItem(h_, IDC_F_LINEAS);
-        RECT r;
-        GetClientRect(lista, &r);
-        if (r.right < 50 || r.bottom < 30 || (r.right == tamLogo_.cx && r.bottom == tamLogo_.cy)) return;
-        tamLogo_ = {r.right, r.bottom};
-        LVBKIMAGEW bk{};
-        bk.hbm = App::instancia().logoTenue(r.right * 3 / 4, r.bottom * 9 / 10);
-        if (!bk.hbm) return;
-        bk.ulFlags = LVBKIF_SOURCE_HBITMAP | LVBKIF_STYLE_NORMAL;
-        bk.xOffsetPercent = 50;
-        bk.yOffsetPercent = 50;
-        SendMessageW(lista, LVM_SETBKIMAGEW, 0, reinterpret_cast<LPARAM>(&bk));
-        ListView_SetTextBkColor(lista, CLR_NONE);
     }
 
     bool alComando(int id, int codigo) override {
         if (cliente_.comando(id, codigo)) return true;
         switch (id) {
-            case IDC_F_BUSCAR:
-                cliente_.elegir();
-                return true;
             case IDC_F_TIPO:
                 if (codigo == CBN_SELCHANGE) {
                     ponerPrecioSugerido();
@@ -137,13 +112,11 @@ public:
 
     void alAceptar() override {
         HWND foco = GetFocus();
-        if (cliente_.alPresionarEnter()) {
-            if (cliente_.hayCliente()) enfocar(h_, IDC_F_CANTIDAD);
+        if (cliente_.tieneFoco()) {
+            cliente_.alPresionarEnter();
         } else if (foco == GetDlgItem(h_, IDC_F_CANTIDAD) || foco == GetDlgItem(h_, IDC_F_GALONES) ||
                    foco == GetDlgItem(h_, IDC_F_PRECIO)) {
             agregarLinea(true);
-        } else if (foco == GetDlgItem(h_, IDC_F_NOMBRE)) {
-            enfocar(h_, IDC_F_CANTIDAD);
         }
     }
 
@@ -159,7 +132,7 @@ private:
         ponerTexto(h_, IDC_F_GALONES, "");
         refrescarLineas();
         alMostrar();
-        enfocar(h_, IDC_F_DNI);
+        enfocar(h_, IDC_F_BUSCA);
     }
 
     void cargarPrecios(bool cambiarPrecio) {
@@ -326,8 +299,12 @@ private:
             return;
         }
         Factura f;
-        Cliente c;
-        if (!intentar(h_, [&] { c = cliente_.obtenerORegistrar(); })) return;
+        if (!cliente_.cliente()) {
+            mostrarAviso(h_, "Busque y elija el cliente (escriba su nombre o DNI en el buscador de arriba).");
+            enfocar(h_, IDC_F_BUSCA);
+            return;
+        }
+        const Cliente c = *cliente_.cliente();
         f.clienteId = c.id;
         f.fecha = leerFecha(h_, IDC_F_FECHA);
         f.lineas = lineas_;
@@ -382,8 +359,7 @@ private:
         colorTexto(IDC_F_NUMERO, categoria == CATEGORIA_UVA ? RGB(155, 27, 48) : RGB(138, 90, 60));
     }
 
-    SIZE tamLogo_{0, 0};
-    EntradaCliente cliente_;
+    BuscadorCliente cliente_;
     std::vector<LineaFactura> lineas_;
     PreciosDia precios_;
     bool pagadoEditado_ = false;

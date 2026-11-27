@@ -37,6 +37,7 @@
 #define IDD_NUBE 234
 #define IDD_RESPALDOS_NUBE 235
 #define IDD_ACTUALIZACION 236
+#define IDD_CLIENTE_NUEVO 237
 
 // ---------------------------------------------------------------- Menú
 #define IDM_RESPALDAR 40001
@@ -103,6 +104,11 @@
 #define IDC_F_LBL_NOMBRE 1031
 #define IDC_F_LBL_TEL 1032
 #define IDC_F_INFORME 1033
+#define IDC_F_BUSCA 1034
+#define IDC_F_CLI_NOMBRE 1035
+#define IDC_F_CLI_DATOS 1036
+#define IDC_F_CLI_DEUDA 1037
+#define IDC_F_CLI_QUITAR 1038
 
 // ---------------------------------------------------------------- Historial
 #define IDC_H_DESDE 1101
@@ -119,6 +125,8 @@
 #define IDC_H_VER 1112
 #define IDC_H_CARPETA 1113
 #define IDC_H_EXCEL 1114
+#define IDC_H_PERIODO 1115
+#define IDC_H_LBL_A 1116
 
 // ---------------------------------------------------------------- Clientes
 #define IDC_C_NOMBRE 1201
@@ -354,6 +362,14 @@
 
 #define IDC_AC_INFO 3701
 #define IDC_AC_NOTAS 3702
+
+#define IDC_CN_NOMBRE 3801
+#define IDC_CN_DNI 3802
+#define IDC_CN_TEL 3803
+#define IDC_CN_RTN 3804
+#define IDC_CN_CARNET 3805
+#define IDC_CN_DIR 3806
+#define IDC_CN_INFO 3807
 
 // Control de pestañas de la ventana principal.
 #define IDC_PESTANAS 3000

@@ -17,22 +17,9 @@ HWND Pagina::crear(HWND padre, int plantilla) {
 }
 
 void Pagina::aplicarMarcaAgua(int marca) {
-    if (!controlEstirable_) return;
-    HWND lista = GetDlgItem(h_, controlEstirable_);
-    wchar_t clase[32] = {0};
-    GetClassNameW(lista, clase, 31);
-    if (std::wstring(clase) != WC_LISTVIEWW) return;
-    LVBKIMAGEW bk{};
-    HBITMAP imagen = marca == 0 ? nullptr : App::instancia().marcaAguaParaLista(marca);
-    if (imagen) {
-        bk.ulFlags = LVBKIF_TYPE_WATERMARK;
-        bk.hbm = imagen;  // la tabla se queda con la imagen
-    } else {
-        bk.ulFlags = LVBKIF_SOURCE_NONE;
-    }
-    SendMessageW(lista, LVM_SETBKIMAGEW, 0, reinterpret_cast<LPARAM>(&bk));
-    ListView_SetTextBkColor(lista, CLR_NONE);
-    InvalidateRect(lista, nullptr, TRUE);
+    // El logo del beneficio, tenue, de fondo en toda la pestaña (también detrás de las tablas).
+    tema::usarLogo(h_, marca != 0);
+    if (h_) tema::refrescar(h_);
 }
 
 void Pagina::colorTexto(int id, COLORREF color) {
@@ -70,6 +57,8 @@ void Pagina::guardarDiseno() {
         wchar_t clase[32] = {0};
         GetClassNameW(c, clase, 31);
         o.combo = _wcsicmp(clase, L"ComboBox") == 0;
+        o.tabla = _wcsicmp(clase, WC_LISTVIEWW) == 0;
+        o.marco = _wcsicmp(clase, L"Button") == 0 && (GetWindowLongW(c, GWL_STYLE) & BS_TYPEMASK) == BS_GROUPBOX;
         HFONT f = reinterpret_cast<HFONT>(SendMessageW(c, WM_GETFONT, 0, 0));
         o.tieneLetra = f && GetObjectW(f, sizeof o.letra, &o.letra) > 0;
         // Botones en negrita para que se vean mejor.
@@ -86,31 +75,38 @@ void Pagina::guardarDiseno() {
 
 void Pagina::escalar(int ancho, int alto) {
     if (tamanoDiseno_.cx <= 0 || tamanoDiseno_.cy <= 0 || originales_.empty()) return;
-    double e = std::min(static_cast<double>(ancho) / tamanoDiseno_.cx, static_cast<double>(alto) / tamanoDiseno_.cy);
-    e = std::max(0.85, std::min(e, 2.2));
-    if (std::abs(e - escalaActual_) < 0.01) return;
-    const double cambio = e / escalaActual_;
+    // Cada dirección se ajusta por separado para llenar la ventana; las letras crecen con la menor.
+    double ex = static_cast<double>(ancho) / tamanoDiseno_.cx;
+    double ey = static_cast<double>(alto) / tamanoDiseno_.cy;
+    double e = std::max(0.85, std::min(std::min(ex, ey), 2.2));
+    ex = std::max(0.85, std::min(ex, e * 1.9));
+    ey = std::max(0.85, std::min(ey, e * 1.6));
+    if (std::abs(ex - escalaX_) < 0.005 && std::abs(ey - escalaY_) < 0.005 && std::abs(e - escalaActual_) < 0.005) return;
+    const double cambioX = ex / escalaX_;
     HDWP posiciones = BeginDeferWindowPos(static_cast<int>(originales_.size()));
     for (const auto& o : originales_) {
-        const int x = static_cast<int>(o.rect.left * e), y = static_cast<int>(o.rect.top * e);
-        const int w = static_cast<int>((o.rect.right - o.rect.left) * e);
-        int h = static_cast<int>((o.rect.bottom - o.rect.top) * e);
+        const int x = static_cast<int>(o.rect.left * ex), y = static_cast<int>(o.rect.top * ey);
+        const int w = static_cast<int>((o.rect.right - o.rect.left) * ex);
+        // Tablas y marcos crecen con el alto de la ventana; los campos y botones, con la letra.
+        const int altoOriginal = o.rect.bottom - o.rect.top;
+        const bool crece = o.tabla || o.marco || altoOriginal > 60;
+        int h = static_cast<int>(altoOriginal * (crece ? ey : e));
         if (o.combo) h += static_cast<int>(200 * e);  // alto de la lista desplegable
         if (posiciones)
             posiciones = DeferWindowPos(posiciones, o.control, nullptr, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
         if (o.tieneLetra) SendMessageW(o.control, WM_SETFONT, reinterpret_cast<WPARAM>(letraEscalada(o.letra, e)), FALSE);
         // Columnas de las tablas en proporción.
-        wchar_t clase[32] = {0};
-        GetClassNameW(o.control, clase, 31);
-        if (std::wstring(clase) == WC_LISTVIEWW) {
+        if (o.tabla) {
             HWND encabezado = ListView_GetHeader(o.control);
             const int columnas = encabezado ? Header_GetItemCount(encabezado) : 0;
             for (int i = 0; i < columnas; ++i)
-                ListView_SetColumnWidth(o.control, i, static_cast<int>(ListView_GetColumnWidth(o.control, i) * cambio));
+                ListView_SetColumnWidth(o.control, i, static_cast<int>(ListView_GetColumnWidth(o.control, i) * cambioX));
         }
     }
     if (posiciones) EndDeferWindowPos(posiciones);
     escalaActual_ = e;
+    escalaX_ = ex;
+    escalaY_ = ey;
     InvalidateRect(h_, nullptr, TRUE);
 }
 
@@ -140,8 +136,8 @@ INT_PTR CALLBACK Pagina::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             SetWindowLongPtrW(h, DWLP_USER, lp);
             self->h_ = h;
             intentar(h, [&] { self->alIniciar(); });
-            intentar(h, [&] { self->aplicarMarcaAgua(App::instancia().marcaAgua()); });
             self->guardarDiseno();
+            tema::usarLogo(h, App::instancia().marcaAgua() != 0);
             tema::preparar(h);
             return FALSE;
         case WM_ERASEBKGND:
@@ -221,10 +217,12 @@ INT_PTR CALLBACK Pagina::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (self) {
                 self->escalar(LOWORD(lp), HIWORD(lp));
                 self->alRedimensionar(LOWORD(lp), HIWORD(lp));
+                tema::refrescar(h);  // fondo, tarjetas y logo del nuevo tamaño
             }
             return TRUE;
         case WM_CTLCOLORDLG:
         case WM_CTLCOLORBTN:
+        case WM_CTLCOLOREDIT:
         case WM_CTLCOLORSTATIC: {
             if (!self) return FALSE;
             const auto it = self->coloresTexto_.find(GetDlgCtrlID(reinterpret_cast<HWND>(lp)));

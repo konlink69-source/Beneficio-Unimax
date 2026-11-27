@@ -80,6 +80,8 @@ public:
             vencimientos(dc, {0, y3, anchoGrafico, H});
             productores(dc, {anchoGrafico + g, y3, W, H});
         }
+        // Logo del beneficio de fondo, tenue, encima de todo (como en las demás pestañas).
+        if (App::instancia().marcaAgua() != 0) tema::logoMarca(dc, area);
         return true;
     }
 

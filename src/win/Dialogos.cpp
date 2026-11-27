@@ -56,6 +56,7 @@ INT_PTR CALLBACK DialogoModal::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         }
         case WM_CTLCOLORDLG:
         case WM_CTLCOLORSTATIC:
+        case WM_CTLCOLOREDIT:
         case WM_CTLCOLORBTN: {
             if (!self) return FALSE;
             const INT_PTR propio = self->alColor(msg, reinterpret_cast<HDC>(wp), reinterpret_cast<HWND>(lp));

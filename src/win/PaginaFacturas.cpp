@@ -10,6 +10,7 @@
 #include "win/Impresion.h"
 #include "win/Paginas.h"
 #include "win/Sesion.h"
+#include "win/Tema.h"
 #include "win/resource.h"
 
 #include <shellapi.h>
@@ -37,21 +38,17 @@ public:
         controlEstirable_ = IDC_H_LISTA;
         configurarFecha(h_, IDC_H_DESDE);
         configurarFecha(h_, IDC_H_HASTA);
-        ponerFecha(h_, IDC_H_DESDE, Fecha(Fecha::hoy().anio, 1, 1));
+        ponerFecha(h_, IDC_H_DESDE, Fecha::hoy().primerDiaDelMes());
         ponerFecha(h_, IDC_H_HASTA, Fecha::hoy());
-        textoGuia(h_, IDC_H_FILTRO, L"Nombre o DNI");
-        lvConfigurar(h_, IDC_H_CLIENTES, {{L"Cliente (carpeta)", 150}, {L"Facturas", 34, true}});
+        textoGuia(h_, IDC_H_FILTRO, L"Buscar cliente, DNI o número de factura...");
+        tema::campoBusqueda(GetDlgItem(h_, IDC_H_FILTRO));
+        const char* periodos[] = {"Hoy", "Esta semana", "Este mes", "Mes anterior", "Esta cosecha", "Este año", "Elegir fechas..."};
+        for (int i = 0; i < 7; ++i) comboAgregar(h_, IDC_H_PERIODO, periodos[i], i);
+        comboSeleccionar(h_, IDC_H_PERIODO, P_MES);
+        mostrarFechas(false);
+        lvConfigurar(h_, IDC_H_CLIENTES, {{L"Cliente", 150}, {L"Facturas", 34, true}});
         lvConfigurar(h_, IDC_H_LISTA,
-                     {{L"No.", 46},
-                      {L"Tipo", 50},
-                      {L"Fecha", 50},
-                      {L"Cliente", 120},
-                      {L"Libras", 56, true},
-                      {L"Quintales", 46, true},
-                      {L"Total", 66, true},
-                      {L"Pagado", 66, true},
-                      {L"Saldo", 60, true},
-                      {L"Estado", 46}});
+                     {{L"No.", 60}, {L"Tipo", 70}, {L"Fecha", 66}, {L"Total", 90, true}, {L"Saldo", 80, true}});
         // Ícono de carpeta en la lista de clientes.
         HIMAGELIST iconos = ImageList_Create(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON),
                                              ILC_COLOR32 | ILC_MASK, 1, 1);
@@ -66,7 +63,10 @@ public:
         colorTexto(IDC_H_RESUMEN, COLOR_CAFE);
     }
 
-    void alMostrar() override { buscar(); }
+    void alMostrar() override {
+        if (comboDato(h_, IDC_H_PERIODO, P_MES) != P_ELEGIR) aplicarPeriodo();
+        buscar();
+    }
 
     void alRedimensionar(int ancho, int alto) override {
         estirar(IDC_H_CLIENTES, ancho, alto, false, true);
@@ -75,21 +75,14 @@ public:
 
     bool alComando(int id, int codigo) override {
         switch (id) {
-            case IDC_H_BUSCAR:
-                buscar();
-                return true;
             case IDC_H_FILTRO:
                 if (codigo == EN_CHANGE) mostrarCarpetas();
                 return true;
-            case IDC_H_HOY:
-                ponerFecha(h_, IDC_H_DESDE, Fecha::hoy());
-                ponerFecha(h_, IDC_H_HASTA, Fecha::hoy());
-                buscar();
-                return true;
-            case IDC_H_MES:
-                ponerFecha(h_, IDC_H_DESDE, Fecha::hoy().primerDiaDelMes());
-                ponerFecha(h_, IDC_H_HASTA, Fecha::hoy());
-                buscar();
+            case IDC_H_PERIODO:
+                if (codigo == CBN_SELCHANGE) {
+                    aplicarPeriodo();
+                    buscar();
+                }
                 return true;
             case IDC_H_VER:
                 if (const long f = seleccionada()) verComprobante(h_, f);
@@ -154,6 +147,42 @@ public:
     void alAceptar() override { buscar(); }
 
 private:
+    enum Periodo { P_HOY, P_SEMANA, P_MES, P_MES_ANTERIOR, P_COSECHA, P_ANIO, P_ELEGIR };
+
+    void mostrarFechas(bool si) {
+        for (int id : {IDC_H_DESDE, IDC_H_LBL_A, IDC_H_HASTA}) ShowWindow(GetDlgItem(h_, id), si ? SW_SHOW : SW_HIDE);
+        tema::refrescar(h_);
+    }
+
+    // Pone las fechas según el período elegido (las fechas solo se ven con "Elegir fechas...").
+    void aplicarPeriodo() {
+        const Fecha hoy = Fecha::hoy();
+        const int p = static_cast<int>(comboDato(h_, IDC_H_PERIODO, P_MES));
+        Fecha desde = hoy, hasta = hoy;
+        switch (p) {
+            case P_HOY: break;
+            case P_SEMANA: {
+                const long n = hoy.numeroDia();
+                const int diaSemana = static_cast<int>(((n % 7) + 7 + 3) % 7);  // 0 = lunes
+                desde = hoy.sumarDias(-diaSemana);
+                break;
+            }
+            case P_MES: desde = hoy.primerDiaDelMes(); break;
+            case P_MES_ANTERIOR:
+                hasta = hoy.primerDiaDelMes().sumarDias(-1);
+                desde = hasta.primerDiaDelMes();
+                break;
+            case P_COSECHA: desde = inicioCosecha(hoy); break;
+            case P_ANIO: desde = Fecha(hoy.anio, 1, 1); break;
+            default: break;
+        }
+        if (p != P_ELEGIR) {
+            ponerFecha(h_, IDC_H_DESDE, desde);
+            ponerFecha(h_, IDC_H_HASTA, hasta);
+        }
+        mostrarFechas(p == P_ELEGIR);
+    }
+
     void buscar() {
         facturas_ = repo().facturas(leerFecha(h_, IDC_H_DESDE), leerFecha(h_, IDC_H_HASTA));
         mostrarCarpetas();
@@ -162,7 +191,9 @@ private:
     // Una carpeta por cliente (aunque tenga muchos comprobantes).
     void mostrarCarpetas() {
         std::map<long, Carpeta> carpetas;
+        std::map<long, std::string> numeros;  // números de factura de cada cliente (para buscar por número)
         for (const auto& f : facturas_) {
+            numeros[f.clienteId] += " " + f.numeroTexto();
             Carpeta& c = carpetas[f.clienteId];
             c.clienteId = f.clienteId;
             c.nombre = f.clienteNombre;
@@ -176,7 +207,8 @@ private:
         std::vector<Carpeta> lista;
         const std::string filtro = texto(h_, IDC_H_FILTRO);
         for (const auto& par : carpetas)
-            if (coincideBusqueda(par.second.nombre + " " + par.second.dni, filtro)) lista.push_back(par.second);
+            if (coincideBusqueda(par.second.nombre + " " + par.second.dni + numeros[par.first], filtro))
+                lista.push_back(par.second);
         std::sort(lista.begin(), lista.end(),
                   [](const Carpeta& a, const Carpeta& b) { return normalizarBusqueda(a.nombre) < normalizarBusqueda(b.nombre); });
         HWND lv = GetDlgItem(h_, IDC_H_CLIENTES);
@@ -220,9 +252,8 @@ private:
             if (carpeta_ != TODOS && f.clienteId != carpeta_) continue;
 
             lvAgregar(h_, IDC_H_LISTA,
-                      {f.numeroTexto(), f.categoria == CATEGORIA_UVA ? "UVA" : "PERGAMINO", f.fecha.texto(), f.clienteNombre, formatoDecimal(f.totalLibras, 2),
-                       formatoDecimal(aQuintales(f.totalLibras), 2), formatoLempiras(f.total), formatoLempiras(f.pagado),
-                       formatoLempiras(f.saldo), f.anulada ? "ANULADO" : "Válido"},
+                      {f.numeroTexto(), f.categoria == CATEGORIA_UVA ? "Uva" : "Pergamino", f.fecha.texto(),
+                       formatoLempiras(f.total), f.anulada ? "Anulado" : (f.saldo > 0 ? formatoLempiras(f.saldo) : "Pagado")},
                       f.id);
             if (f.anulada) {
                 colores_[f.id] = COLOR_GRIS;

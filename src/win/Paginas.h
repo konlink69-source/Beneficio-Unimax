@@ -70,12 +70,16 @@ private:
         LOGFONTW letra;
         bool tieneLetra;
         bool combo;
+        bool tabla;
+        bool marco;
     };
     void guardarDiseno();
     void escalar(int ancho, int alto);
     std::vector<Original> originales_;
     SIZE tamanoDiseno_{0, 0};
     double escalaActual_ = 1.0;
+    double escalaX_ = 1.0;
+    double escalaY_ = 1.0;
 
     static INT_PTR CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp);
 };
