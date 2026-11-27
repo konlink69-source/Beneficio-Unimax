@@ -142,7 +142,8 @@ bool esImpresoraVirtual(const std::wstring& nombre) {
 
 std::wstring impresoraConfigurada() {
     const auto lista = impresoras();
-    const std::wstring elegida = W(repo().config("Impresora"));
+    // La impresora es de cada computadora (no se toma la de otra computadora por Google Drive).
+    const std::wstring elegida = W(App::instancia().configEquipo("Impresora", repo().config("Impresora")));
     if (!elegida.empty() && !esImpresoraVirtual(elegida))
         for (const auto& p : lista)
             if (p == elegida) return elegida;
@@ -218,7 +219,8 @@ Lienzo lienzoDeFactura(long facturaId, Factura* factura, Cliente* cliente) {
     if (factura) *factura = *f;
     if (cliente) *cliente = *c;
     // Las facturas llevan siempre el sello (opción 2) como marca de agua.
-    return lienzoComprobante(repo().empresa(), *f, *c, MARCA_SELLO);
+    return lienzoComprobante(repo().empresa(), *f, *c, MARCA_SELLO,
+                             static_cast<int>(repo().configEntero("DisenoComprobante", DISENO_COMPROBANTE_ACTUAL)));
 }
 
 std::wstring imprimirComprobante(long facturaId) {

@@ -151,9 +151,11 @@ void crearEsquema(Conexion& c, Dialecto d) {
 
     // Configuración inicial.
     insertarConfigSiFalta(c, "VersionEsquema", std::to_string(VERSION_ESQUEMA));
-    c.preparar("UPDATE Configuracion SET Valor = ? WHERE Clave = ?")
+    // Solo se escribe si cambió: abrir una base al día no debe contar como cambio (sincronización).
+    c.preparar("UPDATE Configuracion SET Valor = ? WHERE Clave = ? AND (Valor IS NULL OR Valor <> ?)")
         .pTexto(std::to_string(VERSION_ESQUEMA))
         .pTexto("VersionEsquema")
+        .pTexto(std::to_string(VERSION_ESQUEMA))
         .ejecutar();
     insertarConfigSiFalta(c, "EmpresaNombre", "Beneficio Unimax");
     insertarConfigSiFalta(c, "EmpresaRTN", "");

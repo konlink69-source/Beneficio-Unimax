@@ -44,7 +44,16 @@ struct Lienzo {
     void imagen(double x, double y, double ancho, double alto, const std::string& nombre);
 };
 
-Lienzo lienzoComprobante(const Empresa& e, const Factura& f, const Cliente& c, int marcaAgua);
+// Diseños del comprobante. Cuando una actualización cambia el diseño, el anterior se conserva aquí
+// (con su número) y se puede seguir usando desde Configuración.
+struct DisenoDocumento {
+    int numero;
+    std::string nombre;
+};
+constexpr int DISENO_COMPROBANTE_ACTUAL = 1;
+std::vector<DisenoDocumento> disenosComprobante();
+Lienzo lienzoComprobante(const Empresa& e, const Factura& f, const Cliente& c, int marcaAgua,
+                         int diseno = DISENO_COMPROBANTE_ACTUAL);
 
 // Informe del día: libras y quintales de uva y pergamino (hoy, el mes y la cosecha).
 Lienzo lienzoInformeDia(const Empresa& e, const Fecha& dia, const ResumenDia& hoy, const ResumenDia& mes,

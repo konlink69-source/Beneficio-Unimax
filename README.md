@@ -149,8 +149,74 @@ Documentos\BeneficioUnimax\
 ```
 
 - La base de datos se puede **abrir con Access** para consultas propias, pero no cambie la estructura de las tablas.
-- **Respaldo:** *Archivo → Respaldar base de datos...* Hágalo al menos una vez por semana y guarde una copia fuera de la computadora (USB o nube).
+- **Respaldo:** con Google Drive conectado (sección 6.1) los respaldos son automáticos. Sin Google Drive, use
+  *Archivo → Respaldar base de datos...* al menos una vez por semana y guarde una copia fuera de la computadora.
 - Para usar otra carpeta, por ejemplo una carpeta compartida, abra el programa con: `BeneficioUnimax.exe /datos "D:\Contabilidad"`.
+
+### 6.1 Google Drive: respaldos automáticos y trabajar desde otra computadora
+
+Con Google Drive conectado, el programa guarda sus datos en la carpeta **Beneficio Unimax** de su Drive:
+
+```
+Mi unidad\Beneficio Unimax\
+├── BeneficioUnimax.accdb   ← los datos más recientes (clientes, facturas, caja, usuarios y contraseñas)
+├── estado.json             ← versión de los datos y qué computadora los tiene abiertos
+├── Respaldos\              ← copias con fecha
+├── Documentos\             ← copia de los comprobantes PDF y reportes
+└── Plantillas\             ← copia de las plantillas (con las versiones anteriores)
+```
+
+**Cuándo se guarda:** al **cerrar la caja**, al **salir del programa**, **cada hora** si hubo cambios y con
+*Nube → Guardar en Google Drive ahora*. Si no hay Internet se sigue trabajando normal y los cambios se suben
+cuando vuelva la conexión.
+
+**Respaldos que se conservan:** todos los de las últimas 48 horas, uno por día del último mes y uno por mes
+de antes. Para verlos o volver a uno: *Nube → Respaldos en Google Drive*. Al restaurar, los datos actuales se
+guardan antes como respaldo, así que se puede deshacer. Restaurar pide la contraseña de un administrador.
+
+**Seguir trabajando en otra computadora:**
+1. Instale el programa en la otra computadora (mismo enlace de descarga).
+2. Al abrirlo por primera vez pregunta *"¿Ya usa Beneficio Unimax en otra computadora...?"*: elija **Sí** y
+   entre con la **misma cuenta de Google**. Se descargan todos los datos, con los mismos usuarios y contraseñas.
+3. Desde ahí, cada vez que abra el programa en cualquiera de las dos computadoras, toma los datos más
+   recientes que se subieron desde la otra.
+
+**Si el programa está abierto en otra computadora**, se abre en modo **SOLO CONSULTA**: se ven los datos (la
+última copia subida) pero no se puede registrar ni cambiar nada, para que no se mezclen. Para trabajar ahí,
+cierre el programa en la otra computadora y vuelva a abrirlo. Si una computadora se apagó sin cerrar el
+programa (se fue la luz), queda liberada sola a los 20 minutos.
+
+**Si hay cambios en las dos** (por ejemplo, una trabajó sin Internet), al abrir el programa pregunta qué datos
+usar. Los otros no se pierden: quedan como respaldo en Drive.
+
+La impresora elegida es de cada computadora; el resto de la configuración viaja con los datos.
+
+#### Preparar Google Drive (una sola vez)
+
+Google exige que el programa esté registrado como "aplicación" en una cuenta de Google Cloud (es gratis).
+Esto se hace **una sola vez** y sirve para todas las computadoras:
+
+1. Entre a <https://console.cloud.google.com/> con su cuenta de Google y cree un proyecto (por ejemplo
+   *Beneficio Unimax*).
+2. Menú **APIs y servicios → Biblioteca**: busque **Google Drive API** y presione **Habilitar**.
+3. **APIs y servicios → Pantalla de consentimiento de OAuth** (o *Google Auth Platform*): tipo **Externo**,
+   nombre *Beneficio Unimax*, su correo como contacto. En *Permisos* (scopes) agregue
+   `https://www.googleapis.com/auth/drive.file` (con ese permiso el programa solo ve los archivos que él mismo
+   crea, no el resto de su Drive). En **Público / Estado de publicación** presione **Publicar la aplicación**
+   ("En producción"). Si la deja "En prueba", Google desconecta las computadoras cada 7 días.
+4. **APIs y servicios → Credenciales → Crear credenciales → ID de cliente de OAuth**, tipo
+   **Aplicación de escritorio**. Copie el **ID de cliente** y el **Secreto del cliente**.
+5. Póngalos en el programa, de una de estas dos formas:
+   - **En el programa:** *Nube → Google Drive...* → escriba el ID y el secreto → *Guardar estos datos* →
+     *Conectar con Google Drive*. Hay que escribirlos en cada computadora nueva.
+   - **Incluidos en la descarga** (recomendado): en GitHub, *Settings → Secrets and variables → Actions*, cree
+     los secretos `BU_GOOGLE_CLIENT_ID` y `BU_GOOGLE_CLIENT_SECRET`. Desde la siguiente versión, el programa los
+     trae incluidos y en las computadoras nuevas solo hay que elegir la cuenta de Google.
+6. Al conectar, Google puede mostrar *"Google no verificó esta app"*: es su propia aplicación; presione
+   *Configuración avanzada → Ir a Beneficio Unimax* y luego **Permitir**.
+
+El permiso queda guardado en cada computadora, cifrado con la cuenta de Windows. Para quitarlo:
+*Nube → Google Drive... → Desconectar* (pide contraseña de administrador).
 
 ---
 
@@ -186,6 +252,13 @@ letras, columnas, agregar el logotipo, etc. Para que el programa siga sabiendo d
 | `ReporteCompras.xlsx` | Compras del período, con resumen por tipo de café |
 | `ReporteVentas.xlsx` | Ventas del período |
 | `ReporteCaja.xlsx` | Resumen de caja por día |
+| `ReporteGeneral.xlsx` | Reporte general de la cosecha |
+
+**Versiones anteriores:** cuando una actualización trae plantillas con otro estilo o estructura, las que usted
+tenía no se borran: se guardan en `Plantillas\Anteriores\Versión N (fecha)`. En *Configuración → Versiones de
+documentos* puede elegir seguir usando una versión anterior (*Plantillas de Excel*) y, cuando cambie el diseño
+del comprobante, el diseño anterior también queda para elegir (*Diseño del comprobante*). Los comprobantes ya
+guardados (PDF) nunca se modifican.
 
 Las plantillas originales se generan con `python tools/generar_plantillas.py` (requiere `openpyxl`).
 
@@ -206,7 +279,39 @@ Para cambiarlo, edite `tools/generar_logo.py` y ejecute `python tools/generar_lo
 
 ---
 
-## 9. Problemas frecuentes
+## 9. Actualizaciones automáticas
+
+Cada vez que se abre, el programa revisa si hay una versión nueva. Si la hay, muestra **qué cambió** y el botón
+**Actualizar ahora**: guarda un respaldo (en Google Drive si está conectado), descarga la versión nueva,
+comprueba que el archivo esté completo (huella SHA-256), se cierra, se reemplaza y se vuelve a abrir. También
+se puede revisar a mano en *Ayuda → Buscar actualizaciones del programa*.
+
+La base de datos, los comprobantes y las plantillas **no se tocan**; si la versión nueva necesita columnas o
+tablas nuevas, las agrega sola sin borrar nada. Si hay un comprobante a medio llenar, avisa antes.
+
+**Requisito: descargas públicas.** El programa descarga las versiones sin iniciar sesión en GitHub, así que la
+página de *Releases* debe ser pública. Hay dos formas:
+
+- Hacer público este repositorio (*Settings → General → Danger Zone → Change visibility*).
+- O dejar el código privado y publicar solo las descargas en un repositorio **público aparte** (por ejemplo
+  `Beneficio-Unimax-descargas`, con al menos un archivo, como un README): en este repositorio, en
+  *Settings → Secrets and variables → Actions*, cree la **variable** `BU_REPOSITORIO_DESCARGAS` con
+  `usuario/Beneficio-Unimax-descargas` y el **secreto** `BU_TOKEN_DESCARGAS` con un token de GitHub
+  (*fine-grained*, permiso *Contents: Read and write* sobre ese repositorio). El enlace de descarga pasa a ser
+  `https://github.com/usuario/Beneficio-Unimax-descargas/releases/latest/download/BeneficioUnimax.exe`.
+
+---
+
+## 10. Problemas frecuentes
+
+**Google Drive: "Falta el ID de cliente de Google".** Haga los pasos de la sección 6.1 (*Preparar Google Drive*).
+
+**Google Drive: "Google retiró el permiso de esta computadora".** Pasa si la aplicación de Google quedó
+"En prueba" (vence a los 7 días) o si se quitó el acceso en la cuenta de Google. Publique la aplicación
+(sección 6.1, paso 3) y conecte de nuevo en *Nube → Google Drive...*.
+
+**Dice "SOLO CONSULTA" pero el programa no está abierto en la otra computadora.** Si la otra se apagó sin
+cerrar el programa, espere 20 minutos y vuelva a abrirlo. El aviso dice qué computadora y desde qué hora.
 
 **"No se pudo crear/abrir la base de datos" o un mensaje sobre el controlador (driver).**
 El programa usa el controlador ODBC *Microsoft Access Driver (\*.mdb, \*.accdb)* de 64 bits. Para revisarlo:
@@ -231,15 +336,16 @@ estar encendida y con la sesión iniciada a la hora del aviso.
 
 ---
 
-## 10. Para programadores
+## 11. Para programadores
 
 ```
 src/core/   Lógica del negocio sin Windows: fechas, dinero (en centavos), DNI, montos en letras,
             modelos y contenido de los documentos de Excel.
 src/db/     ODBC (Access en Windows, SQLite en las pruebas), creación de tablas y Repositorio
             (todas las operaciones del negocio, con transacciones).
-src/win/    Interfaz Win32: ventana con pestañas, diálogos (app.rc), Excel por COM, avisos.
-tests/      Pruebas automáticas (328 comprobaciones).
+src/win/    Interfaz Win32: ventana con pestañas, diálogos (app.rc), Excel por COM, avisos,
+            Google Drive (WinHTTP + OAuth con PKCE), sincronización (Nube) y actualizaciones.
+tests/      Pruebas automáticas (387 comprobaciones).
 plantillas/ Plantillas de Excel.
 tools/      Generadores del logo y de las plantillas, verificación de plantillas.
 logo/       Logo en SVG y PNG.
@@ -253,3 +359,8 @@ El programa crea las tablas solo. Los montos se guardan como `CURRENCY` y los pe
 - En Windows, `pruebas.exe` crea una base de datos de Access temporal y prueba todas las operaciones. Sirve también para comprobar que el controlador de Access funciona.
 - En Linux, las mismas pruebas usan SQLite: `sudo apt install unixodbc-dev libsqliteodbc`, luego `cmake -S . -B build && cmake --build build && ./build/pruebas`.
 - `./build/pruebas --nombres | python tools/verificar_plantillas.py` revisa que las plantillas tengan todas las celdas con nombre.
+
+**Sincronización:** las reglas (qué hacer al abrir, bloqueo entre computadoras, respaldos que se conservan,
+formato de `version.txt`) están en `src/core/Sincronizacion.*` y tienen pruebas. GitHub Actions compila con
+`-DBU_VERSION=<número de compilación>` y publica `version.txt` (versión, SHA-256, tamaño y el mensaje del
+commit como "qué cambió") junto al `.exe`.

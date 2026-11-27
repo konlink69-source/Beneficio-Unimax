@@ -16,6 +16,7 @@ namespace {
 
 class PaginaFactura : public Pagina {
 public:
+    bool trabajoSinGuardar() const override { return !lineas_.empty(); }
     const wchar_t* titulo() const override { return L"Comprobante de compra"; }
 
     void alIniciar() override {

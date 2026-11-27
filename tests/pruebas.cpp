@@ -8,11 +8,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <set>
 #include <string>
 
 #include "core/Documentos.h"
 #include "core/Grafico.h"
 #include "core/Seguridad.h"
+#include "core/Json.h"
+#include "core/Sincronizacion.h"
 #include "core/Identificacion.h"
 #include "core/NumeroLetras.h"
 #include "core/Texto.h"
@@ -250,6 +253,121 @@ static void pruebasSeguridad() {
 }
 
 // ====================================================================== Base de datos
+static void pruebasSincronizacion() {
+    // JSON
+    const Json j = Json::parsear(R"({"a": 1, "b": "hóla \"x\"", "c": [true, null, 2.5], "d": {"e": "5"}})");
+    CHECK_EQ(j["a"].entero(), 1LL);
+    CHECK_EQ(j["b"].texto(), std::string("hóla \"x\""));
+    CHECK_EQ(j["c"].tamano(), static_cast<size_t>(3));
+    CHECK(j["c"][0].booleano());
+    CHECK(j["c"][1].esNulo());
+    CHECK_EQ(j["d"]["e"].entero(), 5LL);
+    CHECK(j["zz"]["y"].esNulo());
+    CHECK_EQ(Json::parsear(j.serializar()).serializar(), j.serializar());
+    bool lanzo = false;
+    try {
+        Json::parsear("{\"a\": }");
+    } catch (const std::exception&) {
+        lanzo = true;
+    }
+    CHECK(lanzo);
+
+    // Fechas RFC 3339
+    CHECK_EQ(momentoDesdeRfc3339("1970-01-02T00:00:00Z"), 86400LL);
+    CHECK_EQ(momentoDesdeRfc3339("2026-11-27T21:30:05.123Z"), momentoDesdeRfc3339("2026-11-27T15:30:05-06:00"));
+    CHECK_EQ(momentoRfc3339(momentoDesdeRfc3339("2026-11-27T21:30:05Z")), std::string("2026-11-27T21:30:05Z"));
+    CHECK_EQ(momentoTexto(momentoDesdeRfc3339("2026-11-27T21:30:05Z"), -6 * 3600), std::string("27/11/2026 15:30"));
+
+    // Bloqueo
+    Bloqueo b;
+    CHECK(evaluarBloqueo(b, "A", 1000) == EstadoBloqueo::Libre);
+    b.dispositivo = "B";
+    b.latido = 1000;
+    CHECK(evaluarBloqueo(b, "A", 1000 + 60) == EstadoBloqueo::Ajeno);
+    CHECK(evaluarBloqueo(b, "B", 1000 + 60) == EstadoBloqueo::Propio);
+    CHECK(evaluarBloqueo(b, "A", 1000 + BLOQUEO_VENCE_SEGUNDOS + 1) == EstadoBloqueo::Vencido);
+
+    // Estados en JSON
+    EstadoNube n;
+    n.version = 7;
+    n.equipo = "PC-OFICINA";
+    n.subido = 1800000000;
+    n.bloqueo = b;
+    n.bloqueo.equipo = "LAPTOP";
+    const EstadoNube n2 = estadoNubeDesdeJson(Json::parsear(aJson(n).serializar()));
+    CHECK_EQ(n2.version, 7LL);
+    CHECK_EQ(n2.equipo, std::string("PC-OFICINA"));
+    CHECK_EQ(n2.subido, 1800000000LL);
+    CHECK_EQ(n2.bloqueo.equipo, std::string("LAPTOP"));
+    CHECK_EQ(n2.bloqueo.latido, 1000LL);
+    EstadoNube sinBloqueo;
+    CHECK(estadoNubeDesdeJson(Json::parsear(aJson(sinBloqueo).serializar())).bloqueo.vacio());
+    EstadoLocal l;
+    l.dispositivo = "X";
+    l.versionBase = 3;
+    l.pendiente = true;
+    l.archivosSubidos = {"Documentos/a.pdf|10|5"};
+    const EstadoLocal l2 = estadoLocalDesdeJson(Json::parsear(aJson(l).serializar()));
+    CHECK_EQ(l2.versionBase, 3LL);
+    CHECK(l2.pendiente);
+    CHECK_EQ(l2.archivosSubidos.size(), static_cast<size_t>(1));
+
+    // Decisión al abrir
+    EstadoLocal loc;
+    EstadoNube nube;
+    CHECK(decidirAlAbrir(loc, false, nube, true) == AccionAlAbrir::PrimeraSubida);
+    CHECK(decidirAlAbrir(loc, false, nube, false) == AccionAlAbrir::Nada);
+    nube.version = 5;
+    CHECK(decidirAlAbrir(loc, true, nube, false) == AccionAlAbrir::Descargar);
+    CHECK(decidirAlAbrir(loc, true, nube, true) == AccionAlAbrir::Conflicto);  // nunca sincronizada y con datos
+    loc.versionBase = 4;
+    CHECK(decidirAlAbrir(loc, true, nube, true) == AccionAlAbrir::Descargar);
+    loc.pendiente = true;
+    CHECK(decidirAlAbrir(loc, true, nube, true) == AccionAlAbrir::Conflicto);
+    loc.versionBase = 5;
+    CHECK(decidirAlAbrir(loc, true, nube, true) == AccionAlAbrir::Subir);
+    loc.pendiente = false;
+    CHECK(decidirAlAbrir(loc, true, nube, true) == AccionAlAbrir::Nada);
+
+    // Respaldos: uno por hora durante 90 días
+    const Momento ahora = momentoDesdeRfc3339("2026-11-27T18:00:00Z");
+    std::vector<ArchivoRespaldo> rs;
+    for (int h = 0; h < 24 * 90; ++h) rs.push_back({std::to_string(h), ahora - h * 3600LL});
+    const auto borrar = respaldosABorrar(rs, ahora, -6 * 3600);
+    std::set<std::string> borrados(borrar.begin(), borrar.end());
+    CHECK(!borrados.count("0"));
+    CHECK(!borrados.count("47"));   // dentro de 48 horas
+    CHECK(!borrados.count("9"));
+    const size_t quedan = rs.size() - borrar.size();
+    CHECK(quedan >= 49 + 28 && quedan <= 49 + 31 + 3);  // 48 h + ~1 por día de 30 días + ~2 meses
+    CHECK(respaldosABorrar({{"a", ahora - 400 * 86400LL}}, ahora, 0).empty());  // siempre quedan los 10 últimos
+    CHECK_EQ(nombreRespaldo(momentoDesdeRfc3339("2026-11-27T21:05:00Z"), -6 * 3600, "cierre de caja"),
+             std::string("Respaldo 2026-11-27 15.05 (cierre de caja).accdb"));
+
+    // version.txt
+    const InfoVersion v = parsearInfoVersion("version=57\r\nsha256=" + std::string(64, 'A') +
+                                             "\ntamano=1234\n---\nFacturas nuevas\nOtra línea\n");
+    CHECK_EQ(v.numero, 57);
+    CHECK_EQ(v.sha256, std::string(64, 'a'));
+    CHECK_EQ(v.tamano, 1234LL);
+    CHECK_EQ(v.notas, std::string("Facturas nuevas\nOtra línea"));
+    CHECK(v.valida());
+    CHECK(!parsearInfoVersion("<html>Not found</html>").valida());
+
+    // Red
+    CHECK_EQ(base64(reinterpret_cast<const uint8_t*>("foobar"), 6), std::string("Zm9vYmFy"));
+    CHECK_EQ(base64(reinterpret_cast<const uint8_t*>("fo"), 2), std::string("Zm8="));
+    const uint8_t raros[] = {0xfb, 0xff};
+    CHECK_EQ(base64Url(raros, 2), std::string("-_8"));
+    CHECK_EQ(codificarUrl("a b/ñ"), std::string("a%20b%2F%C3%B1"));
+    CHECK_EQ(decodificarUrl(codificarUrl("a b/ñ=&")), std::string("a b/ñ=&"));
+    CHECK_EQ(parametroConsulta("state=x&code=4%2F0Ab&scope=y", "code"), std::string("4/0Ab"));
+    CHECK_EQ(parametroConsulta("state=x", "code"), std::string());
+    // Ejemplo del RFC 7636 (apéndice B).
+    CHECK_EQ(desafioPkce("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+             std::string("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"));
+}
+
 static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     db::crearEsquema(con, dialecto);
     db::crearEsquema(con, dialecto);  // debe poder repetirse sin error
@@ -258,6 +376,33 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     const Fecha hoy = Fecha::hoy();
     const Fecha ayer = hoy.sumarDias(-1);
     const Fecha anteayer = hoy.sumarDias(-2);
+
+    // --- Aviso de cambios (sincronización) y modo solo consulta
+    {
+        int cambios = 0;
+        con.alModificar = [&] { ++cambios; };
+        // Volver a abrir una base al día no debe contar como cambio (si no, se subiría cada hora sin motivo).
+        repo.asegurarUsuarioMaestro(std::vector<uint8_t>(16, 7));
+        cambios = 0;
+        db::crearEsquema(con, dialecto);
+        repo.asegurarUsuarioMaestro(std::vector<uint8_t>(16, 7));
+        CHECK_EQ(cambios, 0);
+        (void)repo.config("EmpresaNombre");
+        CHECK_EQ(cambios, 0);
+        repo.setConfig("PruebaNube", "1");
+        CHECK(cambios > 0);
+        con.alModificar = nullptr;
+        con.soloLectura = true;
+        bool lanzo = false;
+        try {
+            repo.setConfig("PruebaNube", "2");
+        } catch (const db::ErrorBD&) {
+            lanzo = true;
+        }
+        CHECK(lanzo);
+        CHECK_EQ(repo.config("PruebaNube"), std::string("1"));  // leer sigue funcionando
+        con.soloLectura = false;
+    }
 
     // --- Configuración
     CHECK_EQ(repo.config("EmpresaNombre"), std::string("Beneficio Unimax"));
@@ -671,6 +816,7 @@ int main(int argc, char** argv) {
     pruebasNumeroLetras();
     pruebasTextoYModelos();
     pruebasSeguridad();
+    pruebasSincronizacion();
     try {
         if (ejecutarPruebasBD() != 0) return 1;
     } catch (const std::exception& e) {

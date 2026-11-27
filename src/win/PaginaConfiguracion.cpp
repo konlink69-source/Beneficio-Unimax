@@ -4,6 +4,7 @@
 #include "core/Grafico.h"
 #include "win/Avisos.h"
 #include "win/Impresion.h"
+#include "win/Nube.h"
 #include "win/Sesion.h"
 #include "win/Paginas.h"
 #include "win/resource.h"
@@ -77,6 +78,9 @@ public:
             case IDC_G_CARPETA:
                 abrirCarpeta(App::instancia().rutas().datos);
                 return true;
+            case IDC_G_NUBE:
+                Nube::instancia().dialogoNube(h_);
+                return true;
             default:
                 return false;
         }
@@ -110,7 +114,7 @@ private:
         const std::wstring predeterminada = impresoraPredeterminada();
         comboAgregar(h_, IDC_G_IMPRESORA,
                      "Predeterminada de Windows" + (predeterminada.empty() ? std::string() : " (" + U(predeterminada) + ")"), 0);
-        const std::wstring elegida = W(r.config("Impresora"));
+        const std::wstring elegida = W(App::instancia().configEquipo("Impresora", r.config("Impresora")));
         int seleccion = 0;
         for (size_t i = 0; i < impresoras_.size(); ++i) {
             comboAgregar(h_, IDC_G_IMPRESORA, U(impresoras_[i]), static_cast<LPARAM>(i + 1));
@@ -121,6 +125,19 @@ private:
         ponerTexto(h_, IDC_G_MINIMO, formatoMonto(App::instancia().minimoCaja()));
         CheckDlgButton(h_, IDC_G_PDF_COMP, r.config("GuardarPdfComprobante", "1") == "1" ? BST_CHECKED : BST_UNCHECKED);
         comboSeleccionar(h_, IDC_G_MARCA, App::instancia().marcaAgua());
+        // Versiones de documentos (las anteriores se conservan al actualizar).
+        versiones_ = App::instancia().versionesPlantillas();
+        SendDlgItemMessageW(h_, IDC_G_PLANTILLAS, CB_RESETCONTENT, 0, 0);
+        const std::string enUso = r.config("PlantillasEnUso");
+        int vSel = 0;
+        for (size_t i = 0; i < versiones_.size(); ++i) {
+            comboAgregar(h_, IDC_G_PLANTILLAS, versiones_[i].second, static_cast<LPARAM>(i));
+            if (versiones_[i].first == enUso) vSel = static_cast<int>(i);
+        }
+        comboSeleccionar(h_, IDC_G_PLANTILLAS, vSel);
+        SendDlgItemMessageW(h_, IDC_G_DISENO, CB_RESETCONTENT, 0, 0);
+        for (const auto& d : disenosComprobante()) comboAgregar(h_, IDC_G_DISENO, d.nombre, d.numero);
+        comboSeleccionar(h_, IDC_G_DISENO, r.configEntero("DisenoComprobante", DISENO_COMPROBANTE_ACTUAL));
 
         ponerTexto(h_, IDC_G_RUTA, "Base de datos: " + U(App::instancia().rutas().baseDatos) +
                                        "\nComprobantes y reportes: " + U(App::instancia().rutas().documentos));
@@ -159,7 +176,11 @@ private:
             r.setConfig("DiasAnticipacion", std::to_string(static_cast<long>(*dias)));
             r.setConfig("RecordatorioAlAbrir", IsDlgButtonChecked(h_, IDC_G_ALABRIR) == BST_CHECKED ? "1" : "0");
             r.setConfig("HoraAviso", hora);
-            r.setConfig("Impresora", U(impresoraElegida()));
+            App::instancia().setConfigEquipo("Impresora", U(impresoraElegida()));
+            const LPARAM v = comboDato(h_, IDC_G_PLANTILLAS, 0);
+            r.setConfig("PlantillasEnUso",
+                        (v >= 0 && static_cast<size_t>(v) < versiones_.size()) ? versiones_[static_cast<size_t>(v)].first : "");
+            r.setConfig("DisenoComprobante", std::to_string(comboDato(h_, IDC_G_DISENO, DISENO_COMPROBANTE_ACTUAL)));
             r.setConfig("CopiasComprobante", std::to_string(static_cast<long>(*copias)));
             r.setConfig("GuardarPdfComprobante", IsDlgButtonChecked(h_, IDC_G_PDF_COMP) == BST_CHECKED ? "1" : "0");
             r.setConfig("MarcaAgua", std::to_string(marca));
@@ -202,6 +223,7 @@ private:
     }
 
     std::vector<std::wstring> impresoras_;
+    std::vector<std::pair<std::string, std::string>> versiones_;
 };
 
 }  // namespace

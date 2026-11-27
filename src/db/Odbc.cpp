@@ -1,5 +1,6 @@
 #include "db/Odbc.h"
 
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -207,6 +208,13 @@ struct Sentencia::Param {
 };
 
 Sentencia::Sentencia(Conexion& c, const std::string& sql) : c_(&c) {
+    {
+        size_t i = sql.find_first_not_of(" \t\r\n(");
+        std::string palabra;
+        while (i < sql.size() && std::isalpha(static_cast<unsigned char>(sql[i])))
+            palabra += static_cast<char>(std::toupper(static_cast<unsigned char>(sql[i++])));
+        modifica_ = palabra != "SELECT" && palabra != "PRAGMA" && palabra != "WITH";
+    }
     verificar(SQLAllocHandle(SQL_HANDLE_STMT, c.handle(), &h_), SQL_HANDLE_DBC, c.handle(), "Preparar consulta");
     std::u16string s = aUtf16(sql);
     const SQLRETURN rc = SQLPrepareW(h_, W(s), static_cast<SQLINTEGER>(s.size()));
@@ -223,7 +231,8 @@ Sentencia::~Sentencia() {
 }
 
 Sentencia::Sentencia(Sentencia&& o) noexcept
-    : c_(o.c_), h_(o.h_), params_(std::move(o.params_)), fila_(std::move(o.fila_)), numColumnas_(o.numColumnas_) {
+    : c_(o.c_), h_(o.h_), params_(std::move(o.params_)), fila_(std::move(o.fila_)), numColumnas_(o.numColumnas_),
+      modifica_(o.modifica_) {
     o.h_ = SQL_NULL_HSTMT;
 }
 
@@ -314,8 +323,15 @@ Sentencia& Sentencia::pNulo() {
 }
 
 Sentencia& Sentencia::ejecutar() {
+    if (modifica_ && c_->soloLectura) throw ErrorBD(c_->mensajeSoloLectura);
     const SQLRETURN rc = SQLExecute(h_);
     verificar(rc, SQL_HANDLE_STMT, h_, "Error al ejecutar la consulta");
+    if (modifica_ && c_->alModificar) {
+        // Un UPDATE que no cambió ninguna fila no cuenta (las tablas nuevas, ALTER, etc. dan -1 y sí cuentan).
+        SQLLEN filas = -1;
+        if (!SQL_SUCCEEDED(SQLRowCount(h_, &filas))) filas = -1;
+        if (filas != 0) c_->alModificar();
+    }
     SQLSMALLINT n = 0;
     SQLNumResultCols(h_, &n);
     numColumnas_ = n;

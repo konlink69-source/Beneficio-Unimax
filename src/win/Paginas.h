@@ -33,6 +33,8 @@ public:
     virtual void alAceptar() {}
     // Se llama al cambiar el tamaño. Por defecto estira "controlEstirable_" hasta el borde.
     virtual void alRedimensionar(int ancho, int alto);
+    // ¿Hay algo a medio hacer (por ejemplo, un comprobante sin guardar)? Se revisa antes de actualizar.
+    virtual bool trabajoSinGuardar() const { return false; }
     // Pone (o quita) la marca de agua en la tabla principal de la pestaña.
     void aplicarMarcaAgua(int marca);
 

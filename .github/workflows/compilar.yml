@@ -33,7 +33,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configurar
-        run: cmake -S . -B build -A x64 -DBU_PRUEBAS=ON
+        # Número de versión = número de compilación (lo usan las actualizaciones automáticas).
+        # Los datos de la aplicación de Google (para conectar Google Drive) vienen de los "secrets"
+        # del repositorio; si no existen, el usuario los escribe en el programa (Nube → Google Drive).
+        env:
+          BU_GOOGLE_CLIENT_ID: ${{ secrets.BU_GOOGLE_CLIENT_ID }}
+          BU_GOOGLE_CLIENT_SECRET: ${{ secrets.BU_GOOGLE_CLIENT_SECRET }}
+        # Las actualizaciones se descargan sin iniciar sesión, así que deben publicarse en un repositorio
+        # PÚBLICO: este mismo, o uno aparte solo para descargas (variable BU_REPOSITORIO_DESCARGAS).
+        run: >-
+          cmake -S . -B build -A x64 -DBU_PRUEBAS=ON -DBU_VERSION=${{ github.run_number }}
+          -DBU_REPOSITORIO=${{ vars.BU_REPOSITORIO_DESCARGAS || github.repository }}
       - name: Compilar
         run: cmake --build build --config Release
       - name: Preparar carpeta del programa
@@ -62,10 +72,24 @@ jobs:
           path: BeneficioUnimax
       - name: Crear el .zip
         run: zip -r BeneficioUnimax-windows-x64.zip BeneficioUnimax
+      - name: Crear version.txt (para las actualizaciones automáticas)
+        env:
+          MENSAJE: ${{ github.event.head_commit.message }}
+        run: |
+          {
+            echo "version=${{ github.run_number }}"
+            echo "sha256=$(sha256sum BeneficioUnimax/BeneficioUnimax.exe | cut -d' ' -f1)"
+            echo "tamano=$(stat -c%s BeneficioUnimax/BeneficioUnimax.exe)"
+            echo "---"
+            if [ -n "$MENSAJE" ]; then printf '%s\n' "$MENSAJE" | { grep -v -E '^(Co-Authored-By|Claude-Session):' || true; }; else echo "Mejoras y correcciones."; fi
+          } > version.txt
+          cat version.txt
       - name: Publicar la última versión
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+          # Repositorio aparte para descargas (opcional): variable BU_REPOSITORIO_DESCARGAS y un token con
+          # permiso de escritura en él, en el secreto BU_TOKEN_DESCARGAS.
+          GH_TOKEN: ${{ secrets.BU_TOKEN_DESCARGAS || github.token }}
+          GH_REPO: ${{ vars.BU_REPOSITORIO_DESCARGAS || github.repository }}
         run: |
           cat > notas.md <<'NOTAS'
           **Para abrir el programa:** descargue **`BeneficioUnimax.exe`** (abajo, en *Assets*) y ábralo.
@@ -79,15 +103,15 @@ jobs:
              escritorio. De ahí en adelante ábralo con doble clic en ese ícono.
 
           Requisitos: Windows 10/11 de 64 bits con Office de 64 bits (Excel y Access).
-          Para actualizar, descargue y abra el nuevo `BeneficioUnimax.exe` y elija **Sí**: sus datos
-          (en `Documentos\BeneficioUnimax`) no cambian.
+          **Actualizaciones:** el programa revisa al abrir si hay una versión nueva y la instala con un clic
+          (menú *Ayuda → Buscar actualizaciones*). Sus datos (en `Documentos\BeneficioUnimax`) no cambian.
 
           Otros archivos: `pruebas.exe` comprueba que el controlador de Access de su Office funciona;
           el .zip trae lo mismo junto con el manual (README).
           NOTAS
           gh release delete ultima-version --yes --cleanup-tag || true
           gh release create ultima-version \
-            BeneficioUnimax/BeneficioUnimax.exe BeneficioUnimax/pruebas.exe BeneficioUnimax-windows-x64.zip \
-            --target "$GITHUB_SHA" --latest \
-            --title "Beneficio Unimax: última versión ($(date -u +%Y-%m-%d))" \
+            BeneficioUnimax/BeneficioUnimax.exe BeneficioUnimax/pruebas.exe BeneficioUnimax-windows-x64.zip version.txt \
+            $([ "$GH_REPO" = "$GITHUB_REPOSITORY" ] && echo "--target $GITHUB_SHA") --latest \
+            --title "Beneficio Unimax: versión ${{ github.run_number }} ($(date -u +%Y-%m-%d))" \
             --notes-file notas.md

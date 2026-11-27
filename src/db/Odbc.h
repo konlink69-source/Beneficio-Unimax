@@ -10,6 +10,7 @@
 #include <sql.h>
 #include <sqlext.h>
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -52,6 +53,12 @@ public:
     void revertir();
 
     SQLHDBC handle() const { return dbc_; }
+
+    // Se llama después de cada INSERT/UPDATE/DELETE/ALTER... que se ejecutó bien (sincronización).
+    std::function<void()> alModificar;
+    // Modo "solo consulta": cualquier cambio lanza ErrorBD con este mensaje.
+    bool soloLectura = false;
+    std::string mensajeSoloLectura = "La base de datos está abierta solo para consulta.";
 
 private:
     SQLHENV env_ = SQL_NULL_HENV;
@@ -122,6 +129,7 @@ private:
     std::vector<std::unique_ptr<Param>> params_;
     std::vector<std::optional<std::u16string>> fila_;
     int numColumnas_ = 0;
+    bool modifica_ = false;  // la consulta cambia datos (no es SELECT)
 };
 
 }  // namespace bu::db

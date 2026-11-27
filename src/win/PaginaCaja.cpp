@@ -3,6 +3,7 @@
 #include "win/App.h"
 #include "win/Dialogos.h"
 #include "win/Excel.h"
+#include "win/Nube.h"
 #include "win/Paginas.h"
 #include "win/Sesion.h"
 #include "win/resource.h"
@@ -179,6 +180,8 @@ private:
                                "(salvo que reabra la caja). Lo contado será el saldo inicial del día siguiente.";
         if (!confirmar(h_, pregunta)) return;
         if (!intentar(h_, [&] { repo().cerrarCaja(f, *contado, texto(h_, IDC_K_NOTAS)); })) return;
+        // Respaldo con fecha en Google Drive (en segundo plano, no hay que esperar).
+        Nube::instancia().respaldoCierreCaja();
         cargar(false);
         if (confirmar(h_, "Caja cerrada. ¿Desea abrir el reporte del cierre en Excel para imprimirlo?")) imprimir();
     }

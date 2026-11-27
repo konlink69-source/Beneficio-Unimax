@@ -78,8 +78,15 @@ BEGIN
         MENUITEM "&Recordatorio de deudas de hoy", IDM_RECORDATORIO
         MENUITEM "&Informe del día", IDM_INFORME
     END
+    POPUP "&Nube"
+    BEGIN
+        MENUITEM "&Guardar en Google Drive ahora", IDM_NUBE_SINCRONIZAR
+        MENUITEM "&Respaldos en Google Drive (ver y restaurar)...", IDM_NUBE_RESPALDOS
+        MENUITEM "Google &Drive (conectar y estado)...", IDM_NUBE_CONFIGURAR
+    END
     POPUP "Ay&uda"
     BEGIN
+        MENUITEM "&Buscar actualizaciones del programa", IDM_ACTUALIZAR
         MENUITEM "&Acerca de Beneficio Unimax", IDM_ACERCA
     END
 END
@@ -361,7 +368,7 @@ BEGIN
 END
 
 // =====================================================================  Configuración
-IDD_PAG_CONFIG DIALOGEX 0, 0, 560, 298
+IDD_PAG_CONFIG DIALOGEX 0, 0, 560, 316
 STYLE ESTILO_PAGINA
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
@@ -418,6 +425,13 @@ BEGIN
     LTEXT           "Se pide usuario y contraseña al abrir. Anular, reabrir la caja o cambiar datos delicados pide la contraseña de un administrador.", IDC_STATIC, 288, 215, 258, 18
     PUSHBUTTON      "Usuarios...", IDC_G_USUARIOS, 288, 236, 70, 16
     PUSHBUTTON      "Cambiar mi contraseña...", IDC_G_CLAVE, 362, 236, 100, 16
+
+    GROUPBOX        "Versiones de documentos y Google Drive", IDC_STATIC, 280, 258, 274, 54
+    LTEXT           "Plantillas de Excel:", IDC_STATIC, 288, 273, 72, 8
+    COMBOBOX        IDC_G_PLANTILLAS, 362, 271, 184, 120, COMBO
+    LTEXT           "Diseño del comprobante:", IDC_STATIC, 288, 293, 84, 8
+    COMBOBOX        IDC_G_DISENO, 374, 291, 100, 80, COMBO
+    PUSHBUTTON      "Google Drive...", IDC_G_NUBE, 478, 290, 68, 16
 
     PUSHBUTTON      "Guardar configuración", IDC_G_GUARDAR, 6, 264, 110, 20
 END
@@ -627,4 +641,58 @@ BEGIN
     AUTOCHECKBOX    "Pedir que cambie la contraseña al ingresar por primera vez", IDC_U2_CAMBIAR, 7, 126, 280, 10
     DEFPUSHBUTTON   "Guardar", IDOK, 188, 166, 50, 16
     PUSHBUTTON      "Cancelar", IDCANCEL, 243, 166, 50, 16
+END
+
+IDD_PROGRESO DIALOGEX 0, 0, 300, 92
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | DS_3DLOOK | WS_POPUP | WS_CAPTION
+CAPTION "Beneficio Unimax"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "", IDC_P_TEXTO, 10, 10, 280, 40
+    CONTROL         "", IDC_P_BARRA, "msctls_progress32", WS_BORDER, 10, 54, 280, 10
+    PUSHBUTTON      "Cancelar", IDCANCEL, 240, 72, 50, 14
+END
+
+IDD_NUBE DIALOGEX 0, 0, 330, 238
+STYLE ESTILO_MODAL
+CAPTION "Google Drive: respaldos y otras computadoras"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "", IDC_N_ESTADO, 10, 10, 310, 64
+    PUSHBUTTON      "Conectar con Google Drive", IDC_N_CONECTAR, 10, 80, 110, 18
+    PUSHBUTTON      "Guardar ahora", IDC_N_SINCRONIZAR, 126, 80, 80, 18
+    PUSHBUTTON      "Respaldos...", IDC_N_RESPALDOS, 212, 80, 80, 18
+    GROUPBOX        "Aplicación de Google (solo la primera vez; vea el manual)", IDC_STATIC, 10, 108, 310, 100
+    LTEXT           "Si el programa ya trae estos datos, no hace falta escribir nada. Si no, cópielos de Google Cloud (Credenciales, ID de cliente de tipo Escritorio).", IDC_STATIC, 18, 120, 294, 24
+    LTEXT           "ID de cliente:", IDC_STATIC, 18, 150, 70, 8
+    EDITTEXT        IDC_N_CLIENTE, 90, 148, 222, 14, ES_AUTOHSCROLL
+    LTEXT           "Secreto de cliente:", IDC_STATIC, 18, 170, 70, 8
+    EDITTEXT        IDC_N_SECRETO, 90, 168, 222, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Guardar estos datos", IDC_N_GUARDAR, 232, 188, 80, 14
+    PUSHBUTTON      "Cerrar", IDCANCEL, 270, 216, 50, 16
+END
+
+IDD_RESPALDOS_NUBE DIALOGEX 0, 0, 400, 240
+STYLE ESTILO_MODAL
+CAPTION "Respaldos en Google Drive"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "Se guardan todos los de las últimas 48 horas, uno por día del último mes y uno por mes de antes.", IDC_RN_INFO, 7, 7, 386, 10
+    CONTROL         "", IDC_RN_LISTA, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 20, 386, 190
+    PUSHBUTTON      "Restaurar este respaldo...", IDC_RN_RESTAURAR, 7, 218, 100, 16
+    PUSHBUTTON      "Guardar una copia en la PC...", IDC_RN_DESCARGAR, 112, 218, 110, 16
+    PUSHBUTTON      "Cerrar", IDCANCEL, 343, 218, 50, 16
+END
+
+IDD_ACTUALIZACION DIALOGEX 0, 0, 330, 220
+STYLE ESTILO_MODAL
+CAPTION "Actualización de Beneficio Unimax"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "", IDC_AC_INFO, 10, 10, 310, 36
+    LTEXT           "Qué cambió:", IDC_STATIC, 10, 50, 100, 8
+    EDITTEXT        IDC_AC_NOTAS, 10, 61, 310, 110, ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
+    LTEXT           "Antes de actualizar se guarda un respaldo (en Google Drive si está conectado). Sus datos, facturas y plantillas no cambian.", IDC_STATIC, 10, 176, 310, 18
+    DEFPUSHBUTTON   "Actualizar ahora", IDOK, 196, 198, 70, 16
+    PUSHBUTTON      "Más tarde", IDCANCEL, 270, 198, 50, 16
 END

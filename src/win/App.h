@@ -4,6 +4,8 @@
 
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "db/Odbc.h"
 #include "db/Repositorio.h"
@@ -39,6 +41,8 @@ constexpr UINT WM_APP_INICIO = WM_APP + 1;
 constexpr UINT WM_APP_RECORDATORIO = WM_APP + 2;
 constexpr UINT WM_APP_IR_PAGINA = WM_APP + 3;
 constexpr UINT WM_APP_MARCA_AGUA = WM_APP + 4;  // cambió la marca de agua en Configuración
+constexpr UINT WM_APP_NUBE = WM_APP + 5;        // cambió el estado de Google Drive (wp = 1: otro equipo tomó los datos)
+constexpr UINT WM_APP_ACTUALIZACION = WM_APP + 6;  // hay una versión nueva (lp = InfoVersion*)
 extern const wchar_t* const CLASE_VENTANA;
 
 class App {
@@ -46,10 +50,22 @@ public:
     static App& instancia();
 
     // Prepara carpetas, crea la base de datos si no existe y la abre.
-    bool iniciar(const std::wstring& carpetaDatos, std::string& error);
+    // "sincronizar": revisa Google Drive antes de abrir (no se usa en el aviso diario de Windows).
+    bool iniciar(const std::wstring& carpetaDatos, std::string& error, bool sincronizar = false);
+    // Copia la base de datos completa y consistente (cierra la conexión un instante).
+    bool instantanea(const std::wstring& destino);
+    // Cambia la base de datos por "nuevo"; la actual se mueve a "copiaAnterior". Vuelve a abrirla.
+    bool reemplazarBase(const std::wstring& nuevo, const std::wstring& copiaAnterior, std::string& error);
+    // Ruta de la base de datos abierta (la copia de consulta si el equipo está en SOLO CONSULTA).
+    const std::wstring& baseAbierta() const { return baseAbierta_; }
     Repositorio& repo() { return *repo_; }
     const Rutas& rutas() const { return rutas_; }
     std::wstring rutaPlantilla(const std::string& archivo) const;
+    // Versiones de plantillas disponibles: (carpeta relativa a Plantillas, nombre). "" = las actuales.
+    std::vector<std::pair<std::string, std::string>> versionesPlantillas() const;
+    // Ajustes propios de esta computadora (no viajan a otras por Google Drive), p. ej. la impresora.
+    std::string configEquipo(const std::string& clave, const std::string& defecto = "") const;
+    void setConfigEquipo(const std::string& clave, const std::string& valor);
 
     // Copia la base de datos a un archivo elegido por el usuario.
     void respaldar(HWND padre);
@@ -86,8 +102,10 @@ public:
 private:
     App() = default;
     void abrirBaseDatos();
+    void aplicarSoloConsulta();
 
     Rutas rutas_;
+    std::wstring baseAbierta_;
     db::Conexion conexion_;
     std::unique_ptr<Repositorio> repo_;
     Usuario usuario_;

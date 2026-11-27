@@ -32,6 +32,10 @@
 #define IDD_AUTORIZAR 230
 #define IDD_USUARIOS 231
 #define IDD_USUARIO 232
+#define IDD_PROGRESO 233
+#define IDD_NUBE 234
+#define IDD_RESPALDOS_NUBE 235
+#define IDD_ACTUALIZACION 236
 
 // ---------------------------------------------------------------- Menú
 #define IDM_RESPALDAR 40001
@@ -45,6 +49,10 @@
 #define IDM_USUARIOS 40009
 #define IDM_CERRAR_SESION 40010
 #define IDM_INFORME 40011
+#define IDM_NUBE_SINCRONIZAR 40012
+#define IDM_NUBE_RESPALDOS 40013
+#define IDM_NUBE_CONFIGURAR 40014
+#define IDM_ACTUALIZAR 40015
 
 // ---------------------------------------------------------------- Plantillas de Excel incluidas en el .exe
 #define IDR_PLT_FACTURA 300
@@ -243,6 +251,9 @@
 #define IDC_G_CLAVE 1825
 #define IDC_G_PROBAR_IMP 1826
 #define IDC_G_MINIMO 1827
+#define IDC_G_PLANTILLAS 1828
+#define IDC_G_DISENO 1829
+#define IDC_G_NUBE 1830
 
 // ---------------------------------------------------------------- Diálogos
 #define IDC_S_BUSCAR 2001
@@ -323,6 +334,25 @@
 #define IDC_U2_REPETIR_LBL 3307
 #define IDC_U2_ACTIVO 3308
 #define IDC_U2_CAMBIAR 3309
+
+#define IDC_P_TEXTO 3401
+#define IDC_P_BARRA 3402
+
+#define IDC_N_ESTADO 3501
+#define IDC_N_CONECTAR 3502
+#define IDC_N_SINCRONIZAR 3503
+#define IDC_N_RESPALDOS 3504
+#define IDC_N_CLIENTE 3505
+#define IDC_N_SECRETO 3506
+#define IDC_N_GUARDAR 3507
+
+#define IDC_RN_LISTA 3601
+#define IDC_RN_RESTAURAR 3602
+#define IDC_RN_DESCARGAR 3603
+#define IDC_RN_INFO 3604
+
+#define IDC_AC_INFO 3701
+#define IDC_AC_NOTAS 3702
 
 // Control de pestañas de la ventana principal.
 #define IDC_PESTANAS 3000

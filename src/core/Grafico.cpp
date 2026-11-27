@@ -92,7 +92,12 @@ void Lienzo::imagen(double x, double y, double ancho, double alto, const std::st
 }
 
 // ================================================================ Comprobante de compra
-Lienzo lienzoComprobante(const Empresa& e, const Factura& f, const Cliente& c, int marcaAgua) {
+std::vector<DisenoDocumento> disenosComprobante() {
+    return {{1, "Noviembre 2026 (actual)"}};
+}
+
+Lienzo lienzoComprobante(const Empresa& e, const Factura& f, const Cliente& c, int marcaAgua, int diseno) {
+    (void)diseno;  // por ahora hay un solo diseño; los siguientes se agregan sin borrar este
     Lienzo l;
     const double izq = 50, der = 800;
 

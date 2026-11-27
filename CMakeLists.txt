@@ -21,6 +21,8 @@ add_library(bu_nucleo STATIC
     src/core/Documentos.cpp
     src/core/Seguridad.cpp
     src/core/Grafico.cpp
+    src/core/Json.cpp
+    src/core/Sincronizacion.cpp
     src/db/Odbc.cpp
     src/db/Esquema.cpp
     src/db/Repositorio.cpp
@@ -60,6 +62,11 @@ if(WIN32)
         src/win/Avisos.cpp
         src/win/Instalacion.cpp
         src/win/Impresion.cpp
+        src/win/Http.cpp
+        src/win/Tareas.cpp
+        src/win/GoogleDrive.cpp
+        src/win/Nube.cpp
+        src/win/Actualizacion.cpp
         src/win/Sesion.cpp
         src/win/Dialogos.cpp
         src/win/Paginas.cpp
@@ -74,7 +81,17 @@ if(WIN32)
         src/win/PaginaConfiguracion.cpp
         src/win/app.rc
     )
-    target_link_libraries(BeneficioUnimax PRIVATE bu_nucleo comctl32 ole32 oleaut32 uuid shell32 shlwapi advapi32 bcrypt winspool gdi32 comdlg32)
+    target_link_libraries(BeneficioUnimax PRIVATE bu_nucleo comctl32 ole32 oleaut32 uuid shell32 shlwapi advapi32 bcrypt winspool gdi32 comdlg32 winhttp ws2_32 crypt32)
+    # Versión (la pone GitHub Actions) y datos de la aplicación de Google (secretos del repositorio).
+    set(BU_VERSION "0" CACHE STRING "Número de versión del programa")
+    set(BU_GOOGLE_CLIENT_ID "$ENV{BU_GOOGLE_CLIENT_ID}" CACHE STRING "ID de cliente de Google (OAuth, Escritorio)")
+    set(BU_GOOGLE_CLIENT_SECRET "$ENV{BU_GOOGLE_CLIENT_SECRET}" CACHE STRING "Secreto de cliente de Google")
+    set(BU_REPOSITORIO "konlink69-source/Beneficio-Unimax" CACHE STRING "Repositorio de GitHub (público) con las descargas")
+    target_compile_definitions(BeneficioUnimax PRIVATE
+        BU_VERSION=${BU_VERSION}
+        "BU_GOOGLE_CLIENT_ID=\"${BU_GOOGLE_CLIENT_ID}\""
+        "BU_GOOGLE_CLIENT_SECRET=\"${BU_GOOGLE_CLIENT_SECRET}\""
+        "BU_REPOSITORIO=\"${BU_REPOSITORIO}\"")
     if(MSVC)
         # El manifiesto (estilos visuales y DPI) va dentro de app.rc.
         target_link_options(BeneficioUnimax PRIVATE /MANIFEST:NO)

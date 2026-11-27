@@ -8,6 +8,7 @@
 
 #include "db/Esquema.h"
 #include "win/Dialogos.h"
+#include "win/Nube.h"
 #include "win/resource.h"
 
 namespace bu::win {
@@ -66,7 +67,10 @@ void actualizarPlantillasSiHaceFalta(const std::wstring& carpeta) {
     }
     if (version >= VERSION_PLANTILLAS) return;
 
-    const std::wstring anteriores = carpeta + L"\\Anteriores";
+    // Las plantillas que había se conservan en "Anteriores\Versión N (fecha)" y se pueden seguir
+    // usando desde Configuración → Plantillas de Excel.
+    const std::wstring anteriores = carpeta + L"\\Anteriores\\Versión " + std::to_wstring(version) + L" (" +
+                                    W(Fecha::hoy().iso()) + L")";
     WIN32_FIND_DATAW fd;
     HANDLE h = FindFirstFileW((carpeta + L"\\*.xlsx").c_str(), &fd);
     if (h != INVALID_HANDLE_VALUE) {
@@ -119,7 +123,7 @@ void extraerPlantillasIncluidas(const std::wstring& destino) {
 }
 }  // namespace
 
-bool App::iniciar(const std::wstring& carpetaDatos, std::string& error) {
+bool App::iniciar(const std::wstring& carpetaDatos, std::string& error, bool sincronizar) {
     wchar_t exe[MAX_PATH];
     GetModuleFileNameW(nullptr, exe, MAX_PATH);
     rutas_.exe = exe;
@@ -138,10 +142,14 @@ bool App::iniciar(const std::wstring& carpetaDatos, std::string& error) {
     copiarPlantillas(rutas_.carpetaExe + L"\\plantillas", rutas_.plantillas);
     extraerPlantillasIncluidas(rutas_.plantillas);
 
-    if (!existeArchivo(rutas_.baseDatos)) {
-        const std::string e = db::crearArchivoAccess(rutas_.baseDatos);
+    baseAbierta_ = rutas_.baseDatos;
+    // Google Drive: trae los datos más nuevos o abre la copia de consulta.
+    if (sincronizar) Nube::instancia().alIniciar(baseAbierta_);
+
+    if (!existeArchivo(baseAbierta_)) {
+        const std::string e = db::crearArchivoAccess(baseAbierta_);
         if (!e.empty()) {
-            error = "No se pudo crear la base de datos de Access:\n" + U(rutas_.baseDatos) + "\n\nDetalle: " + e +
+            error = "No se pudo crear la base de datos de Access:\n" + U(baseAbierta_) + "\n\nDetalle: " + e +
                     "\n\nSolución: instale el \"Microsoft Access Database Engine 2016 Redistributable\" de 64 bits "
                     "(o compile el programa con la misma cantidad de bits que su Office).";
             return false;
@@ -150,7 +158,7 @@ bool App::iniciar(const std::wstring& carpetaDatos, std::string& error) {
     try {
         abrirBaseDatos();
     } catch (const std::exception& e) {
-        error = std::string("No se pudo abrir la base de datos:\n") + U(rutas_.baseDatos) + "\n\nDetalle: " + e.what() +
+        error = std::string("No se pudo abrir la base de datos:\n") + U(baseAbierta_) + "\n\nDetalle: " + e.what() +
                 "\n\nSi el detalle menciona el controlador (driver), instale el \"Microsoft Access Database Engine "
                 "2016 Redistributable\" de 64 bits.";
         return false;
@@ -159,16 +167,68 @@ bool App::iniciar(const std::wstring& carpetaDatos, std::string& error) {
 }
 
 void App::abrirBaseDatos() {
-    conexion_.abrir(db::cadenaConexionAccess(U(rutas_.baseDatos)));
+    conexion_.soloLectura = false;
+    conexion_.alModificar = nullptr;
+    conexion_.abrir(db::cadenaConexionAccess(U(baseAbierta_)));
     db::crearEsquema(conexion_, db::Dialecto::Access);
     repo_ = std::make_unique<Repositorio>(conexion_, db::Dialecto::Access);
     repo_->asegurarUsuarioMaestro(bytesAleatorios(16));
     if (usuario_.id) repo_->usarUsuario(usuario_.usuario);
+    // Cada cambio se anota para subirlo a Google Drive.
+    conexion_.alModificar = [] { Nube::instancia().marcarCambio(); };
+    if (usuario_.id) aplicarSoloConsulta();
+}
+
+void App::aplicarSoloConsulta() {
+    if (!Nube::instancia().soloConsulta()) return;
+    conexion_.soloLectura = true;
+    conexion_.mensajeSoloLectura = "Este equipo está en modo SOLO CONSULTA: " + Nube::instancia().motivoSoloConsulta() +
+                                   "\n\nPuede ver los datos, pero para registrar o cambiar algo cierre el programa en "
+                                   "la otra computadora y vuelva a abrirlo aquí.";
 }
 
 void App::establecerUsuario(const Usuario& u) {
     usuario_ = u;
     if (repo_) repo_->usarUsuario(u.usuario);
+    // En SOLO CONSULTA se bloquean los cambios después de ingresar.
+    aplicarSoloConsulta();
+}
+
+bool App::reemplazarBase(const std::wstring& nuevo, const std::wstring& copiaAnterior, std::string& error) {
+    conexion_.cerrar();
+    bool ok = MoveFileExW(baseAbierta_.c_str(), copiaAnterior.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED) != 0;
+    if (!ok) error = "No se pudo apartar la base de datos actual (código " + std::to_string(GetLastError()) + ").";
+    if (ok && !MoveFileExW(nuevo.c_str(), baseAbierta_.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
+        error = "No se pudo poner la base de datos nueva (código " + std::to_string(GetLastError()) + ").";
+        MoveFileExW(copiaAnterior.c_str(), baseAbierta_.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
+        ok = false;
+    }
+    try {
+        abrirBaseDatos();
+    } catch (const std::exception& e) {
+        error += std::string(" No se pudo abrir la base de datos: ") + e.what();
+        ok = false;
+    }
+    return ok;
+}
+
+bool App::instantanea(const std::wstring& destino) {
+    // Solo se cierra y se vuelve a abrir la conexión: el repositorio sigue siendo el mismo objeto
+    // (puede haber funciones esperando en una ventana que lo usan).
+    const bool soloLectura = conexion_.soloLectura;
+    const std::string mensaje = conexion_.mensajeSoloLectura;
+    auto aviso = conexion_.alModificar;
+    conexion_.cerrar();
+    const BOOL ok = CopyFileW(baseAbierta_.c_str(), destino.c_str(), FALSE);
+    try {
+        conexion_.abrir(db::cadenaConexionAccess(U(baseAbierta_)));
+        conexion_.soloLectura = soloLectura;
+        conexion_.mensajeSoloLectura = mensaje;
+        conexion_.alModificar = aviso;
+    } catch (const std::exception& e) {
+        mostrarError(ventana, std::string("No se pudo volver a abrir la base de datos: ") + e.what());
+    }
+    return ok != 0;
 }
 
 int App::marcaAgua() {
@@ -269,7 +329,53 @@ void App::refrescarMarcaAgua() {
     if (ventana) PostMessageW(ventana, WM_APP_MARCA_AGUA, 0, 0);
 }
 
+std::vector<std::pair<std::string, std::string>> App::versionesPlantillas() const {
+    std::vector<std::pair<std::string, std::string>> r{{"", "Actuales (versión " + std::to_string(VERSION_PLANTILLAS) + ")"}};
+    const std::wstring anteriores = rutas_.plantillas + L"\\Anteriores";
+    WIN32_FIND_DATAW fd;
+    bool sueltas = false;
+    HANDLE h = FindFirstFileW((anteriores + L"\\*").c_str(), &fd);
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            const std::wstring n = fd.cFileName;
+            if (n == L"." || n == L"..") continue;
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                r.push_back({"Anteriores\\" + U(n), U(n)});
+            else if (n.size() > 5 && n.substr(n.size() - 5) == L".xlsx")
+                sueltas = true;
+        } while (FindNextFileW(h, &fd));
+        FindClose(h);
+    }
+    if (sueltas) r.push_back({"Anteriores", "Anteriores (sin fecha)"});
+    return r;
+}
+
+std::string App::configEquipo(const std::string& clave, const std::string& defecto) const {
+    wchar_t buf[512] = {0};
+    DWORD tamano = sizeof buf;
+    if (RegGetValueW(HKEY_CURRENT_USER, L"Software\\BeneficioUnimax", W(clave).c_str(), RRF_RT_REG_SZ, nullptr, buf,
+                     &tamano) == ERROR_SUCCESS)
+        return U(buf);
+    return defecto;
+}
+
+void App::setConfigEquipo(const std::string& clave, const std::string& valor) {
+    const std::wstring v = W(valor);
+    RegSetKeyValueW(HKEY_CURRENT_USER, L"Software\\BeneficioUnimax", W(clave).c_str(), REG_SZ, v.c_str(),
+                    static_cast<DWORD>((v.size() + 1) * sizeof(wchar_t)));
+}
+
 std::wstring App::rutaPlantilla(const std::string& archivo) const {
+    // Versión de plantillas elegida en Configuración (si el archivo existe en esa versión).
+    std::string version;
+    try {
+        if (repo_) version = repo_->config("PlantillasEnUso");
+    } catch (...) {
+    }
+    if (!version.empty()) {
+        const std::wstring anterior = rutas_.plantillas + L"\\" + W(version) + L"\\" + W(archivo);
+        if (existeArchivo(anterior)) return anterior;
+    }
     const std::wstring personal = rutas_.plantillas + L"\\" + W(archivo);
     if (existeArchivo(personal)) return personal;
     return rutas_.carpetaExe + L"\\plantillas\\" + W(archivo);
@@ -294,7 +400,7 @@ void App::respaldar(HWND padre) {
 
     // Se cierra la conexión para copiar el archivo completo y consistente.
     conexion_.cerrar();
-    const BOOL ok = CopyFileW(rutas_.baseDatos.c_str(), destino.c_str(), FALSE);
+    const BOOL ok = CopyFileW(baseAbierta_.c_str(), destino.c_str(), FALSE);
     const DWORD codigo = GetLastError();
     try {
         abrirBaseDatos();
@@ -314,7 +420,11 @@ void App::mostrarRecordatorio(HWND padre, bool forzado) {
         const bool alAbrir = repo().config("RecordatorioAlAbrir", "1") == "1";
         if (!forzado && (!alAbrir || repo().config("UltimoRecordatorio") == hoy.iso())) return;
         const Recordatorio r = repo().recordatorio(hoy);
-        repo().setConfig("UltimoRecordatorio", hoy.iso());
+        try {
+            repo().setConfig("UltimoRecordatorio", hoy.iso());
+        } catch (const std::exception&) {
+            // SOLO CONSULTA: no se anota, no importa.
+        }
         if (forzado || r.hayAlgo()) dialogoRecordatorio(padre, r);
     });
 }

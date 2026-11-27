@@ -6,6 +6,8 @@
 //   /probar             junto con /recordatorio: muestra el aviso aunque no haya pendientes
 //   /verrecordatorio    abre el programa mostrando el recordatorio del día
 //   /noinstalar         no pregunta si se desea instalar (por ejemplo, al probarlo desde Visual Studio)
+//   /actualizar <pid> "destino"   (uso interno) reemplaza la versión anterior por esta y la abre
+//   /actualizado        (uso interno) muestra qué cambió en la versión nueva
 #include "win/App.h"
 
 #include <shellapi.h>
@@ -13,11 +15,14 @@
 #include <array>
 #include <memory>
 
+#include "win/Actualizacion.h"
 #include "win/Avisos.h"
 #include "win/Impresion.h"
 #include "win/Instalacion.h"
+#include "win/Nube.h"
 #include "win/Paginas.h"
 #include "win/Sesion.h"
+#include "win/Version.h"
 #include "win/resource.h"
 
 using namespace bu;
@@ -32,7 +37,10 @@ struct Ventana {
     HBITMAP logo = nullptr;
     int logoAncho = 0;
     int logoAlto = 0;
+    bool datosGuardados = false;  // ya se subió a la nube antes de cerrar (actualización)
 };
+
+constexpr UINT_PTR TEMPORIZADOR_NUBE = 1;
 
 Ventana g;
 
@@ -138,15 +146,20 @@ void pintarEncabezado(HWND h, HDC dc) {
     std::string linea = "Hoy es " + fechaLarga(Fecha::hoy());
     const Usuario& u = App::instancia().usuario();
     if (u.id) linea = "Usuario: " + (u.nombre.empty() ? u.usuario : u.nombre) + " (" + nombreRol(u.rol) + ")    ·    " + linea;
+    const std::string nube = Nube::instancia().resumen();
+    if (!nube.empty()) linea = nube + "    ·    " + linea;
     DrawTextW(dc, W(linea).c_str(), -1, &rf, DT_RIGHT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS);
-    if (App::instancia().cajaBaja()) {
-        // Alerta siempre visible mientras la caja esté bajo el mínimo.
+    std::string alerta;
+    if (Nube::instancia().soloConsulta()) alerta = "SOLO CONSULTA: " + Nube::instancia().motivoSoloConsulta();
+    if (App::instancia().cajaBaja())
+        alerta += std::string(alerta.empty() ? "" : "    ·    ") + "¡Caja baja! Quedan " +
+                  formatoLempiras(App::instancia().saldoCaja()) + " (mínimo " + formatoLempiras(App::instancia().minimoCaja()) + ")";
+    if (!alerta.empty()) {
+        // Alertas siempre visibles (equipo en solo consulta, caja bajo el mínimo).
         RECT ra{rf.left, rf.top + escala(static_cast<int>(tamanoLetra() * 2.1)), rf.right, alto - viga};
         SelectObject(dc, fuente(tamanoLetra() * 1.15, true));
         SetTextColor(dc, COLOR_ROJO);
-        DrawTextW(dc, W("¡Caja baja! Quedan " + formatoLempiras(App::instancia().saldoCaja()) + " (mínimo " +
-                         formatoLempiras(App::instancia().minimoCaja()) + ")").c_str(),
-                  -1, &ra, DT_RIGHT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS);
+        DrawTextW(dc, W(alerta).c_str(), -1, &ra, DT_RIGHT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS);
     }
     SelectObject(dc, fuenteAnterior);
 }
@@ -237,9 +250,29 @@ void despuesDeInstalar(HWND h) {
 
 void acercaDe(HWND h) {
     const Rutas& r = App::instancia().rutas();
-    mostrarInfo(h, "Beneficio Unimax 1.0\nContabilidad de compra y venta de café (uva, pergamino húmedo y seco).\n\n"
+    mostrarInfo(h, "Beneficio Unimax, versión " + std::to_string(VERSION_PROGRAMA) + "\nContabilidad de compra y venta de café (uva, pergamino húmedo y seco).\n\n"
                    "Base de datos (Access): " + U(r.baseDatos) + "\nPlantillas de Excel: " + U(r.plantillas) +
                    "\nDocumentos generados: " + U(r.documentos) + "\n\n1 quintal = 100 libras. Moneda: Lempiras (L).");
+}
+
+bool hayTrabajoSinGuardar() {
+    for (const auto& p : g.paginas)
+        if (p && p->trabajoSinGuardar()) return true;
+    return false;
+}
+
+void cerrarPrograma(HWND h) {
+    if (hayTrabajoSinGuardar() && !confirmar(h, "Hay un comprobante a medio llenar que no se ha guardado.\n\n¿Salir de todas formas?"))
+        return;
+    if (!g.datosGuardados) Nube::instancia().alSalir(h, "al salir");
+    g.datosGuardados = true;
+    DestroyWindow(h);
+}
+
+void actualizarTitulo(HWND h) {
+    std::wstring t = L"Beneficio Unimax - Contabilidad de compra de café";
+    if (Nube::instancia().soloConsulta()) t += L"   [SOLO CONSULTA]";
+    SetWindowTextW(h, t.c_str());
 }
 
 LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
@@ -260,6 +293,18 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             }
             ubicarPaginas(h);
             mostrarPagina(PAG_FACTURA);
+            actualizarTitulo(h);
+            SetTimer(h, TEMPORIZADOR_NUBE, 60 * 1000, nullptr);
+            return 0;
+        case WM_TIMER:
+            if (wp == TEMPORIZADOR_NUBE) {
+                Nube::instancia().cadaMinuto();
+                RECT encabezado{0, 0, 10000, altoEncabezado()};
+                InvalidateRect(h, &encabezado, FALSE);
+            }
+            return 0;
+        case WM_CLOSE:
+            cerrarPrograma(h);
             return 0;
         case WM_SIZE:
             if (g.pestanas) ubicarPaginas(h);
@@ -305,6 +350,8 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case IDM_CERRAR_SESION:
                     ShowWindow(h, SW_HIDE);
                     if (!iniciarSesion(nullptr)) {
+                        if (!g.datosGuardados) Nube::instancia().alSalir(nullptr, "al salir");
+                        g.datosGuardados = true;
                         DestroyWindow(h);
                         return 0;
                     }
@@ -322,17 +369,57 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                     acercaDe(h);
                     return 0;
                 case IDM_SALIR:
-                    DestroyWindow(h);
+                    cerrarPrograma(h);
+                    return 0;
+                case IDM_NUBE_SINCRONIZAR:
+                    Nube::instancia().sincronizarAhora(h);
+                    return 0;
+                case IDM_NUBE_RESPALDOS:
+                    Nube::instancia().dialogoRespaldos(h);
+                    return 0;
+                case IDM_NUBE_CONFIGURAR:
+                    Nube::instancia().dialogoNube(h);
+                    actualizarTitulo(h);
+                    return 0;
+                case IDM_ACTUALIZAR:
+                    if (VERSION_PROGRAMA <= 0)
+                        mostrarInfo(h, "Esta copia del programa se compiló en la computadora (sin número de versión), así "
+                                       "que no busca actualizaciones. Descargue la versión publicada para recibirlas.");
+                    else
+                        buscarActualizacion(h, true);
                     return 0;
                 default:
                     break;
             }
             break;
         case WM_APP_INICIO:
-            if (lp != 0) intentar(h, [&] { despuesDeInstalar(h); });
+            if (lp == 1) intentar(h, [&] { despuesDeInstalar(h); });
+            if (lp == 2) mostrarNovedades(h);
             App::instancia().mostrarRecordatorio(h, wp != 0);
             if (g.actual >= 0) mostrarPagina(g.actual);  // refresca por si cambió algo
+            if (VERSION_PROGRAMA > 0) buscarActualizacion(h, false);
             return 0;
+        case WM_APP_NUBE:
+            if (wp == 1) {
+                Nube::instancia().perdioBloqueo(h);
+                App::instancia().establecerUsuario(App::instancia().usuario());  // aplica el solo consulta
+                actualizarTitulo(h);
+            }
+            InvalidateRect(h, nullptr, FALSE);
+            return 0;
+        case WM_APP_ACTUALIZACION: {
+            std::unique_ptr<InfoVersion> info(reinterpret_cast<InfoVersion*>(lp));
+            if (!info) return 0;
+            if (info->numero < 0) {
+                if (wp) mostrarAviso(h, "No se pudo revisar si hay actualizaciones:\n" + info->notas);
+            } else if (info->numero <= VERSION_PROGRAMA) {
+                if (wp) mostrarInfo(h, "Ya tiene la versión más reciente (" + std::to_string(VERSION_PROGRAMA) + ").");
+            } else if (ofrecerActualizacion(h, *info, hayTrabajoSinGuardar())) {
+                g.datosGuardados = true;
+                DestroyWindow(h);
+            }
+            return 0;
+        }
         case WM_APP_RECORDATORIO:
             App::instancia().mostrarRecordatorio(h, true);
             return 0;
@@ -345,6 +432,7 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         }
         case WM_DESTROY:
+            KillTimer(h, TEMPORIZADOR_NUBE);
             PostQuitMessage(0);
             return 0;
         default:
@@ -359,7 +447,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     bool modoAviso = false, probar = false, verRecordatorio = false, recienInstalado = false, noInstalar = false;
-    std::wstring carpetaDatos;
+    bool recienActualizado = false;
+    DWORD pidAnterior = 0;
+    std::wstring carpetaDatos, destinoActualizacion;
     for (int i = 1; i < argc; ++i) {
         const std::wstring a = argv[i];
         if (_wcsicmp(a.c_str(), L"/recordatorio") == 0) modoAviso = true;
@@ -368,10 +458,21 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
         else if (_wcsicmp(a.c_str(), L"/instalado") == 0) recienInstalado = true;
         else if (_wcsicmp(a.c_str(), L"/noinstalar") == 0) noInstalar = true;
         else if (_wcsicmp(a.c_str(), L"/datos") == 0 && i + 1 < argc) carpetaDatos = argv[++i];
+        else if (_wcsicmp(a.c_str(), L"/actualizado") == 0) recienActualizado = true;
+        else if (_wcsicmp(a.c_str(), L"/actualizar") == 0 && i + 2 < argc) {
+            pidAnterior = static_cast<DWORD>(_wtoi(argv[++i]));
+            destinoActualizacion = argv[++i];
+        }
     }
     LocalFree(argv);
 
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    if (!destinoActualizacion.empty()) {
+        // Versión nueva recién descargada: reemplaza a la anterior y la abre.
+        const int r = completarActualizacion(pidAnterior, destinoActualizacion, carpetaDatos);
+        CoUninitialize();
+        return r;
+    }
     INITCOMMONCONTROLSEX icc{};
     icc.dwSize = sizeof icc;
     icc.dwICC = ICC_WIN95_CLASSES | ICC_DATE_CLASSES | ICC_TAB_CLASSES | ICC_LISTVIEW_CLASSES | ICC_STANDARD_CLASSES;
@@ -397,7 +498,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
         // Abierto desde Descargas u otra carpeta: se ofrece instalarlo con un ícono en el escritorio.
         wchar_t exe[MAX_PATH];
         GetModuleFileNameW(nullptr, exe, MAX_PATH);
-        if (!noInstalar && !recienInstalado && !ejecutandoDesdeInstalacion(exe) && !noPreguntarInstalacion()) {
+        if (!noInstalar && !recienInstalado && !recienActualizado && !ejecutandoDesdeInstalacion(exe) &&
+            !noPreguntarInstalacion()) {
             const int respuesta = MessageBoxW(
                 nullptr,
                 L"¿Desea instalar Beneficio Unimax en esta computadora?\n\n"
@@ -426,8 +528,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     }
 
     std::string error;
-    if (!app.iniciar(carpetaDatos, error)) {
-        if (!modoAviso) MessageBoxW(nullptr, W(error).c_str(), L"Beneficio Unimax", MB_OK | MB_ICONERROR);
+    if (!app.iniciar(carpetaDatos, error, !modoAviso)) {
+        if (!modoAviso && !error.empty()) MessageBoxW(nullptr, W(error).c_str(), L"Beneficio Unimax", MB_OK | MB_ICONERROR);
         CoUninitialize();
         return 1;
     }
@@ -441,6 +543,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     elegirTamanoLetra();
     // Usuario y contraseña antes de mostrar cualquier dato.
     if (!iniciarSesion(nullptr)) {
+        Nube::instancia().alSalir(nullptr, "al salir");  // libera los datos para otras computadoras
         CoUninitialize();
         return 0;
     }
@@ -466,7 +569,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     }
     ShowWindow(h, SW_SHOWMAXIMIZED);
     UpdateWindow(h);
-    PostMessageW(h, WM_APP_INICIO, verRecordatorio ? 1 : 0, recienInstalado ? 1 : 0);
+    PostMessageW(h, WM_APP_INICIO, verRecordatorio ? 1 : 0, recienInstalado ? 1 : (recienActualizado ? 2 : 0));
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
