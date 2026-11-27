@@ -45,6 +45,30 @@ DatosPanel calcularPanel(const std::vector<FilaCompra>& filas, const Fecha& hoy)
     return d;
 }
 
+const char* nombrePeriodo(int p) {
+    static const char* const NOMBRES[] = {"Hoy", "Esta semana", "Este mes", "Mes anterior", "Esta cosecha", "Este año",
+                                          "Elegir fechas..."};
+    return (p >= 0 && p < NUM_PERIODOS) ? NOMBRES[p] : "";
+}
+
+std::pair<Fecha, Fecha> rangoPeriodo(int p, const Fecha& hoy) {
+    switch (p) {
+        case PERIODO_SEMANA: {
+            const long n = hoy.numeroDia();  // 1970-01-01 fue jueves
+            const int desdeLunes = static_cast<int>(((n % 7) + 7 + 3) % 7);
+            return {hoy.sumarDias(-desdeLunes), hoy};
+        }
+        case PERIODO_MES: return {hoy.primerDiaDelMes(), hoy};
+        case PERIODO_MES_ANTERIOR: {
+            const Fecha fin = hoy.primerDiaDelMes().sumarDias(-1);
+            return {fin.primerDiaDelMes(), fin};
+        }
+        case PERIODO_COSECHA: return {inicioCosecha(hoy), hoy};
+        case PERIODO_ANIO: return {Fecha(hoy.anio, 1, 1), hoy};
+        default: return {hoy, hoy};
+    }
+}
+
 const char* mesCosecha(int indice) {
     static const char* const NOMBRES[] = {"Oct", "Nov", "Dic", "Ene", "Feb", "Mar",
                                           "Abr", "May", "Jun", "Jul", "Ago", "Sep"};

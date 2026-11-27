@@ -18,7 +18,7 @@ class BuscadorCliente {
 public:
     using Colorear = std::function<void(int id, COLORREF color)>;
     void configurar(HWND dlg, int idBusca, int idNombre, int idDatos, int idDeuda, int idCambiar, Colorear colorear,
-                    std::function<void()> alElegir);
+                    std::function<void()> alElegir, int tipoNuevo = CLIENTE_PRODUCTOR);
     bool comando(int id, int codigo);  // true si lo atendió
     void recargar();                   // vuelve a leer los clientes registrados
     void limpiar();
@@ -57,9 +57,10 @@ private:
     HWND lista_ = nullptr;
     std::optional<Cliente> cliente_;
     bool poniendo_ = false;
+    int tipoNuevo_ = CLIENTE_PRODUCTOR;
 };
 
 // Ventana para registrar un cliente nuevo (productor). "texto" llena el nombre o el DNI.
-std::optional<Cliente> dialogoClienteNuevo(HWND padre, const std::string& texto);
+std::optional<Cliente> dialogoClienteNuevo(HWND padre, const std::string& texto, int tipo = CLIENTE_PRODUCTOR);
 
 }  // namespace bu::win

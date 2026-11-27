@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "core/Modelos.h"
+#include "core/Panel.h"
 #include "core/Seguridad.h"
 #include "db/Esquema.h"
 #include "db/Odbc.h"
@@ -82,6 +83,8 @@ public:
     std::optional<Factura> facturaPorId(long id);
     std::vector<Factura> facturas(const Fecha& desde, const Fecha& hasta);
     std::vector<FilaCompra> detalleCompras(const Fecha& desde, const Fecha& hasta);
+    // Café en bodega hasta la fecha: compras menos ventas (sin anuladas).
+    Inventario inventario(const Fecha& hasta);
     void anularFactura(long id, const std::string& motivo, const Fecha& hoy);
 
     // ------------------------------------------------ Ventas

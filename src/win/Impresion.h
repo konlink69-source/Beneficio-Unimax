@@ -42,6 +42,8 @@ bool esImpresoraVirtual(const std::wstring& nombre);
 
 // Informe del día (uva y pergamino por separado: hoy, el mes y la cosecha), dentro del programa.
 void verInformeDia(HWND padre, const Fecha& dia);
+// Café en bodega (compras menos ventas), en pantalla y para imprimir.
+void verInventario(HWND padre, const Fecha& hasta);
 // Reporte general en Excel: una fila por día desde el inicio de la cosecha hasta "hasta".
 void generarReporteGeneral(HWND padre, const Fecha& hasta);
 

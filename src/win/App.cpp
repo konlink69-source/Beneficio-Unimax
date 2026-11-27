@@ -2,6 +2,8 @@
 
 #include <commdlg.h>
 
+#include <algorithm>
+
 #include <cstdlib>
 #include <knownfolders.h>
 #include <shlobj.h>
@@ -379,6 +381,27 @@ std::wstring App::rutaPlantilla(const std::string& archivo) const {
     const std::wstring personal = rutas_.plantillas + L"\\" + W(archivo);
     if (existeArchivo(personal)) return personal;
     return rutas_.carpetaExe + L"\\plantillas\\" + W(archivo);
+}
+
+void App::respaldoAutomatico() {
+    if (Nube::instancia().soloConsulta() || !repo_) return;
+    const std::wstring carpeta = rutas_.respaldos + L"\\Automáticos";
+    crearCarpetas(carpeta);
+    // Una copia por día; al salir varias veces el mismo día se actualiza la de hoy.
+    const std::wstring destino = carpeta + L"\\BeneficioUnimax_" + W(Fecha::hoy().iso()) + L".accdb";
+    if (!instantanea(destino)) return;
+    std::vector<std::wstring> copias;
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW((carpeta + L"\\BeneficioUnimax_*.accdb").c_str(), &fd);
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            copias.push_back(fd.cFileName);
+        } while (FindNextFileW(h, &fd));
+        FindClose(h);
+    }
+    // Los nombres llevan la fecha AAAA-MM-DD: en orden alfabético quedan de la más vieja a la más nueva.
+    std::sort(copias.begin(), copias.end());
+    for (size_t i = 0; i + 30 < copias.size(); ++i) DeleteFileW((carpeta + L"\\" + copias[i]).c_str());
 }
 
 void App::respaldar(HWND padre) {

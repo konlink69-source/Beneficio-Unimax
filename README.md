@@ -14,12 +14,18 @@ deudas con clientes y productores, caja diaria y ventas. Usa una base de datos *
 La ventana tiene una **barra café** arriba (logo, nombre de la sección, alertas, fecha y el usuario) y un
 **menú lateral** a la izquierda con las secciones. El menú completo (Archivo, Sesión, Ver, Nube y Ayuda) se
 abre haciendo clic en el **nombre del usuario**, arriba a la derecha. Abajo del menú lateral se ve el estado de
-**Google Drive**.
+**Google Drive**. En pantallas pequeñas (laptops) el menú lateral muestra solo los íconos; al pasar el ratón
+aparece el nombre. Todo se acomoda solo al tamaño de la ventana y de la pantalla.
+
+Para elegir un cliente (en Comprobante, Ventas y Nuevo préstamo) se escribe el **nombre o el DNI** en el
+buscador y se elige de la lista; al final de la lista está **"+ Registrar cliente nuevo"**. En Facturas,
+Ventas y Reportes el período se elige de una lista (Hoy, Esta semana, Este mes, Mes anterior, Esta cosecha,
+Este año o Elegir fechas).
 
 | Sección | Para qué sirve |
 |---|---|
 | **Ingreso** | Al abrir, el programa pide **usuario y contraseña** (ver la sección 3). |
-| **Inicio** | Panel con el resumen: café **uva** y **pergamino** comprado hoy (libras, quintales, lempiras, mes y cosecha), **dinero en caja** (en rojo si está bajo el mínimo), **deudas** (lo que nos deben y lo que debemos), gráfico de **compras por mes** de la cosecha, anillo con el reparto **por tipo de café**, **deudas que vencen pronto** y **mejores productores del mes**. Al hacer clic en una tarjeta se abre la sección correspondiente. |
+| **Inicio** | Panel con el resumen: café **uva** y **pergamino** comprado hoy (libras, quintales, lempiras, mes y cosecha), **dinero en caja** (en rojo si está bajo el mínimo), **deudas** (lo que nos deben y lo que debemos), gráfico de **compras por mes** de la cosecha, anillo con el reparto **por tipo de café**, **deudas que vencen pronto**, **café en bodega** (compras menos ventas, por tipo) y **mejores productores del mes**. Al hacer clic en una tarjeta se abre la sección correspondiente. |
 | **Comprobante de compra** | Se escribe el DNI del productor (si ya existe, aparece su nombre; si no, se registra al guardar). Se agregan líneas de café pesado: tipo, peso en **libras o quintales**, **galones** (como dato) y precio por libra. El programa calcula los subtotales, el total, lo **pagado en efectivo** y el **saldo** que queda debiendo el beneficio, con una fecha de pago opcional. En el campo DNI también se puede escribir el **nombre** y presionar Enter para buscarlo. **Guardar e imprimir** manda el comprobante directo a la impresora; **Guardar** lo muestra dentro del programa. |
 | **Informe del día** | Botón en *Comprobante de compra* (y en *Reportes* y el menú *Ver*): libras y quintales de **uva**, **pergamino húmedo** y **pergamino seco** por separado, del día, del mes y de la cosecha (desde el 1 de octubre). Se ve dentro del programa y se imprime. El **reporte general** (Excel) tiene una fila por día de la cosecha y se vuelve a crear con los datos al día. |
 | **Facturas** | Una **carpeta por cliente** con todos sus comprobantes. Doble clic para **verlo dentro del programa** (sin Excel), imprimirlo, abrir su PDF o **anular** (devuelve el pago a la caja y anula el saldo pendiente). |
@@ -28,7 +34,7 @@ abre haciendo clic en el **nombre del usuario**, arriba a la derecha. Abajo del 
 | **Deudas** | Lo que **el beneficio debe** (saldos de comprobantes, dinero recibido) y lo que **le deben al beneficio** (préstamos, adelantos, saldos de ventas). Registra abonos, muestra vencidas en rojo y permite anular. |
 | **Caja** | **Restante del día anterior** + entradas − salidas = **debe haber en caja**. Se escribe el **dinero contado** y se **cierra la caja**; lo contado pasa a ser el saldo inicial del día siguiente. Todas las compras, abonos, préstamos y ventas se anotan solos en la caja. |
 | **Ventas** | Venta de café a exportadoras u otros compradores (con cobro total o parcial). |
-| **Reportes** | Compras del período, ventas del período, caja por día, cierre de un día, deudas pendientes y estado de cuenta de un cliente (todo en Excel). |
+| **Reportes** | Compras del período, ventas del período, caja por día, cierre de un día, deudas pendientes y estado de cuenta de un cliente (en Excel), informe del día y **café en bodega** (en pantalla e imprimible). |
 | **Configuración** | Datos de la empresa para los comprobantes, saldo inicial de caja, numeración, recordatorio diario, respaldo de la base de datos. |
 
 **Recordatorio diario de deudas** de dos formas:
@@ -155,8 +161,9 @@ Documentos\BeneficioUnimax\
 ```
 
 - La base de datos se puede **abrir con Access** para consultas propias, pero no cambie la estructura de las tablas.
-- **Respaldo:** con Google Drive conectado (sección 6.1) los respaldos son automáticos. Sin Google Drive, use
-  *Archivo → Respaldar base de datos...* al menos una vez por semana y guarde una copia fuera de la computadora.
+- **Respaldo automático en la computadora:** al salir del programa y al cerrar la caja se guarda una copia del
+  día en `Respaldos\Automáticos` (se conservan las últimas 30). Con Google Drive conectado (sección 6.1) además
+  se guardan copias en la nube. También puede hacer una copia a mano: *Archivo → Respaldar base de datos...*
 - Para usar otra carpeta, por ejemplo una carpeta compartida, abra el programa con: `BeneficioUnimax.exe /datos "D:\Contabilidad"`.
 
 ### 6.1 Google Drive: respaldos automáticos y trabajar desde otra computadora
@@ -351,7 +358,7 @@ src/db/     ODBC (Access en Windows, SQLite en las pruebas), creación de tablas
             (todas las operaciones del negocio, con transacciones).
 src/win/    Interfaz Win32: ventana con pestañas, diálogos (app.rc), Excel por COM, avisos,
             Google Drive (WinHTTP + OAuth con PKCE), sincronización (Nube) y actualizaciones.
-tests/      Pruebas automáticas (404 comprobaciones).
+tests/      Pruebas automáticas (481 comprobaciones).
 plantillas/ Plantillas de Excel.
 tools/      Generadores del logo y de las plantillas, verificación de plantillas.
 logo/       Logo en SVG y PNG.

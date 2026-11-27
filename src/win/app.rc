@@ -110,8 +110,8 @@ FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
     GROUPBOX        "1. Cliente (productor que vende el café)", IDC_STATIC, 6, 2, 548, 46
     EDITTEXT        IDC_F_BUSCA, 14, 18, 214, 19, ES_AUTOHSCROLL
-    LTEXT           "", IDC_F_CLI_NOMBRE, 240, 15, 250, 14
-    LTEXT           "", IDC_F_CLI_DATOS, 240, 31, 200, 10
+    LTEXT           "", IDC_F_CLI_NOMBRE, 240, 15, 250, 14, SS_ENDELLIPSIS
+    LTEXT           "", IDC_F_CLI_DATOS, 240, 31, 200, 10, SS_ENDELLIPSIS
     RTEXT           "", IDC_F_CLI_DEUDA, 440, 31, 108, 10
     PUSHBUTTON      "Cambiar", IDC_F_CLI_QUITAR, 496, 13, 52, 15
 
@@ -244,9 +244,7 @@ BEGIN
     LTEXT           "Mostrar:", IDC_STATIC, 8, 9, 30, 8
     COMBOBOX        IDC_D_TIPO, 40, 6, 150, 80, COMBO
     COMBOBOX        IDC_D_ESTADO, 194, 6, 110, 60, COMBO
-    LTEXT           "Cliente:", IDC_STATIC, 310, 9, 28, 8
-    EDITTEXT        IDC_D_FILTRO, 340, 6, 150, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "Actualizar", IDC_D_BUSCAR, 494, 5, 52, 16
+    EDITTEXT        IDC_D_FILTRO, 312, 4, 242, 19, ES_AUTOHSCROLL
     PUSHBUTTON      "Nuevo préstamo / deuda...", IDC_D_NUEVA, 6, 26, 100, 16
     PUSHBUTTON      "Registrar abono...", IDC_D_ABONO, 110, 26, 74, 16
     PUSHBUTTON      "Ver abonos...", IDC_D_DETALLE, 188, 26, 60, 16
@@ -296,12 +294,11 @@ STYLE ESTILO_PAGINA
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
     GROUPBOX        "Nueva venta de café", IDC_STATIC, 6, 2, 548, 98
-    LTEXT           "DNI / RTN del comprador:", IDC_STATIC, 14, 17, 88, 8
-    EDITTEXT        IDC_V_DNI, 104, 15, 90, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "Buscar...", IDC_V_BUSCAR, 198, 14, 46, 16
-    LTEXT           "Nombre:", IDC_STATIC, 252, 17, 30, 8
-    EDITTEXT        IDC_V_NOMBRE, 284, 15, 262, 14, ES_AUTOHSCROLL
-    LTEXT           "", IDC_V_INFO, 14, 32, 532, 9
+    EDITTEXT        IDC_V_BUSCA, 14, 15, 206, 19, ES_AUTOHSCROLL
+    LTEXT           "", IDC_V_CLI_NOMBRE, 230, 13, 256, 13, SS_ENDELLIPSIS
+    LTEXT           "", IDC_V_CLI_DATOS, 230, 27, 190, 9, SS_ENDELLIPSIS
+    RTEXT           "", IDC_V_CLI_DEUDA, 420, 27, 126, 9
+    PUSHBUTTON      "Cambiar", IDC_V_CLI_CAMBIAR, 496, 11, 50, 14
     LTEXT           "Venta No.:", IDC_STATIC, 14, 47, 36, 8
     LTEXT           "", IDC_V_NUMERO, 52, 47, 40, 9
     LTEXT           "Fecha:", IDC_STATIC, 96, 47, 24, 8
@@ -323,13 +320,12 @@ BEGIN
     EDITTEXT        IDC_V_OBS, 70, 80, 300, 14, ES_AUTOHSCROLL
     PUSHBUTTON      "Registrar venta", IDC_V_GUARDAR, 376, 79, 84, 16
     PUSHBUTTON      "Limpiar", IDC_V_LIMPIAR, 464, 79, 82, 16
-    LTEXT           "Desde:", IDC_STATIC, 8, 109, 24, 8
-    CONTROL         "", IDC_V_DESDE, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 34, 106, 66, 14
-    LTEXT           "Hasta:", IDC_STATIC, 106, 109, 22, 8
-    CONTROL         "", IDC_V_HASTA, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 130, 106, 66, 14
-    PUSHBUTTON      "Mostrar", IDC_V_LISTAR, 200, 105, 44, 16
-    PUSHBUTTON      "Anular venta...", IDC_V_ANULAR, 248, 105, 64, 16
-    LTEXT           "", IDC_V_RESUMEN, 318, 109, 236, 9
+    COMBOBOX        IDC_V_PERIODO, 6, 106, 100, 120, COMBO
+    CONTROL         "", IDC_V_DESDE, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 112, 105, 70, 16
+    CTEXT           "a", IDC_V_LBL_A, 184, 109, 10, 8
+    CONTROL         "", IDC_V_HASTA, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 196, 105, 70, 16
+    PUSHBUTTON      "Anular venta...", IDC_V_ANULAR, 272, 105, 64, 16
+    LTEXT           "", IDC_V_RESUMEN, 342, 109, 212, 9
     CONTROL         "", IDC_V_LISTA, "SysListView32", LISTA, 6, 126, 548, 166
 END
 
@@ -338,32 +334,31 @@ IDD_PAG_REPORTES DIALOGEX 0, 0, 560, 298
 STYLE ESTILO_PAGINA
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
-    GROUPBOX        "Período", IDC_STATIC, 6, 2, 548, 36
-    LTEXT           "Desde:", IDC_STATIC, 14, 19, 24, 8
-    CONTROL         "", IDC_R_DESDE, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 40, 16, 70, 14
-    LTEXT           "Hasta:", IDC_STATIC, 118, 19, 22, 8
-    CONTROL         "", IDC_R_HASTA, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 142, 16, 70, 14
-    PUSHBUTTON      "Hoy", IDC_R_HOY, 220, 15, 36, 16
-    PUSHBUTTON      "Este mes", IDC_R_MES, 260, 15, 48, 16
-    PUSHBUTTON      "Mes anterior", IDC_R_MESANT, 312, 15, 56, 16
-    PUSHBUTTON      "Compras del período", IDC_R_COMPRAS, 6, 48, 130, 22
-    LTEXT           "Comprobantes de compra con libras, quintales, galones y montos por tipo de café.", IDC_STATIC, 144, 54, 410, 9
-    PUSHBUTTON      "Ventas del período", IDC_R_VENTAS, 6, 76, 130, 22
-    LTEXT           "Ventas de café a compradores, con lo cobrado y lo que queda por cobrar.", IDC_STATIC, 144, 82, 410, 9
-    PUSHBUTTON      "Caja por día (período)", IDC_R_CAJA, 6, 104, 130, 22
-    LTEXT           "Saldo inicial, entradas, salidas, dinero contado y diferencia de cada día cerrado.", IDC_STATIC, 144, 110, 410, 9
-    PUSHBUTTON      "Cierre de caja (fecha Hasta)", IDC_R_CIERRE, 6, 132, 130, 22
-    LTEXT           "Todos los movimientos de caja del día indicado en Hasta.", IDC_STATIC, 144, 138, 410, 9
-    PUSHBUTTON      "Deudas pendientes", IDC_R_DEUDAS, 6, 160, 130, 22
-    LTEXT           "Lo que el beneficio debe y lo que le deben, con las fechas de pago (no usa el período).", IDC_STATIC, 144, 166, 410, 9
-    PUSHBUTTON      "Estado de cuenta de un cliente...", IDC_R_ESTADO, 6, 188, 130, 22
-    LTEXT           "Deudas y abonos de un cliente o productor.", IDC_STATIC, 144, 194, 410, 9
-    PUSHBUTTON      "Informe del día (fecha Hasta)", IDC_R_INFORME, 6, 216, 130, 22
-    LTEXT           "Libras y quintales de uva y de pergamino (húmedo y seco) por separado: el día, el mes y la cosecha.", IDC_STATIC, 144, 222, 410, 9
-    PUSHBUTTON      "Reporte general de la cosecha", IDC_R_GENERAL, 6, 244, 130, 22
-    LTEXT           "Excel con una fila por día desde el 1 de octubre; se vuelve a crear con los datos al día cada vez.", IDC_STATIC, 144, 250, 410, 9
-    PUSHBUTTON      "Abrir carpeta de documentos", IDC_R_CARPETA, 6, 272, 130, 18
-    LTEXT           "", IDC_R_INFO, 144, 272, 410, 20
+    GROUPBOX        "Período", IDC_STATIC, 6, 2, 548, 38
+    COMBOBOX        IDC_R_PERIODO, 14, 17, 120, 120, COMBO
+    CONTROL         "", IDC_R_DESDE, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 142, 16, 76, 16
+    CTEXT           "a", IDC_R_LBL_A, 220, 20, 10, 8
+    CONTROL         "", IDC_R_HASTA, "SysDateTimePick32", DTS_SHORTDATEFORMAT | WS_TABSTOP, 232, 16, 76, 16
+    PUSHBUTTON      "Compras del período", IDC_R_COMPRAS, 6, 48, 136, 21
+    LTEXT           "Comprobantes de compra con libras, quintales, galones y montos por tipo de café.", IDC_STATIC, 150, 54, 404, 9
+    PUSHBUTTON      "Ventas del período", IDC_R_VENTAS, 6, 73, 136, 21
+    LTEXT           "Ventas de café a compradores, con lo cobrado y lo que queda por cobrar.", IDC_STATIC, 150, 79, 404, 9
+    PUSHBUTTON      "Caja por día (período)", IDC_R_CAJA, 6, 98, 136, 21
+    LTEXT           "Saldo inicial, entradas, salidas, dinero contado y diferencia de cada día cerrado.", IDC_STATIC, 150, 104, 404, 9
+    PUSHBUTTON      "Cierre de caja (último día)", IDC_R_CIERRE, 6, 123, 136, 21
+    LTEXT           "Todos los movimientos de caja del último día del período.", IDC_STATIC, 150, 129, 404, 9
+    PUSHBUTTON      "Informe del día (último día)", IDC_R_INFORME, 6, 148, 136, 21
+    LTEXT           "Libras y quintales de uva y de pergamino (húmedo y seco) por separado: el día, el mes y la cosecha.", IDC_STATIC, 150, 154, 404, 9
+    PUSHBUTTON      "Café en bodega", IDC_R_INVENTARIO, 6, 173, 136, 21
+    LTEXT           "Cuánto café hay por tipo: lo comprado menos lo vendido hasta el último día del período.", IDC_STATIC, 150, 179, 404, 9
+    PUSHBUTTON      "Reporte general de la cosecha", IDC_R_GENERAL, 6, 198, 136, 21
+    LTEXT           "Excel con una fila por día desde el 1 de octubre; se vuelve a crear con los datos al día cada vez.", IDC_STATIC, 150, 204, 404, 9
+    PUSHBUTTON      "Deudas pendientes", IDC_R_DEUDAS, 6, 223, 136, 21
+    LTEXT           "Lo que el beneficio debe y lo que le deben, con las fechas de pago (no usa el período).", IDC_STATIC, 150, 229, 404, 9
+    PUSHBUTTON      "Estado de cuenta de un cliente...", IDC_R_ESTADO, 6, 248, 136, 21
+    LTEXT           "Deudas y abonos de un cliente o productor.", IDC_STATIC, 150, 254, 404, 9
+    PUSHBUTTON      "Abrir carpeta de documentos", IDC_R_CARPETA, 6, 273, 136, 18
+    LTEXT           "", IDC_R_INFO, 150, 273, 404, 18
 END
 
 // =====================================================================  Configuración
@@ -452,12 +447,11 @@ CAPTION "Nuevo préstamo o deuda"
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
     GROUPBOX        "Cliente", IDC_STATIC, 7, 4, 316, 48
-    LTEXT           "DNI / RTN:", IDC_STATIC, 14, 19, 38, 8
-    EDITTEXT        IDC_N_DNI, 54, 17, 86, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "Buscar...", IDC_N_BUSCAR, 144, 16, 46, 16
-    LTEXT           "Nombre:", IDC_STATIC, 14, 37, 38, 8
-    EDITTEXT        IDC_N_NOMBRE, 54, 35, 262, 14, ES_AUTOHSCROLL
-    LTEXT           "", IDC_N_INFO, 7, 55, 316, 9
+    EDITTEXT        IDC_N_BUSCA, 14, 17, 302, 17, ES_AUTOHSCROLL
+    LTEXT           "", IDC_N_CLI_NOMBRE, 14, 37, 240, 12, SS_ENDELLIPSIS
+    PUSHBUTTON      "Cambiar", IDC_N_CLI_CAMBIAR, 270, 36, 46, 13
+    LTEXT           "", IDC_N_INFO, 9, 55, 200, 9, SS_ENDELLIPSIS
+    RTEXT           "", IDC_N_CLI_DEUDA, 210, 55, 113, 9
     AUTORADIOBUTTON "El cliente le debe al beneficio (préstamo o adelanto que se le entrega)", IDC_N_PORCOBRAR, 14, 68, 300, 10, WS_GROUP | WS_TABSTOP
     AUTORADIOBUTTON "El beneficio le debe al cliente (dinero que el beneficio recibe o debe)", IDC_N_PORPAGAR, 14, 80, 300, 10
     LTEXT           "Origen:", IDC_STATIC, 14, 98, 50, 8

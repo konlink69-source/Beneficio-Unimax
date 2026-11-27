@@ -165,8 +165,9 @@ std::string detalleCliente(const Cliente& c) {
 }  // namespace
 
 void BuscadorCliente::configurar(HWND dlg, int idBusca, int idNombre, int idDatos, int idDeuda, int idCambiar,
-                                 Colorear colorear, std::function<void()> alElegir) {
+                                 Colorear colorear, std::function<void()> alElegir, int tipoNuevo) {
     dlg_ = dlg;
+    tipoNuevo_ = tipoNuevo;
     idBusca_ = idBusca;
     idNombre_ = idNombre;
     idDatos_ = idDatos;
@@ -281,7 +282,7 @@ void BuscadorCliente::elegir(int indice) {
     const Sugerencia s = sugerencias_[static_cast<size_t>(indice)];
     ocultar();
     if (s.id == 0) {
-        const auto nuevo = dialogoClienteNuevo(dlg_, recortar(texto(dlg_, idBusca_)));
+        const auto nuevo = dialogoClienteNuevo(dlg_, recortar(texto(dlg_, idBusca_)), tipoNuevo_);
         if (!nuevo) {
             enfocar(dlg_, idBusca_);
             return;
@@ -360,7 +361,7 @@ namespace {
 
 class DialogoClienteNuevo : public DialogoModal {
 public:
-    explicit DialogoClienteNuevo(std::string texto) : texto_(std::move(texto)) {}
+    DialogoClienteNuevo(std::string texto, int tipo) : texto_(std::move(texto)), tipo_(tipo) {}
     std::optional<Cliente> resultado;
 
 protected:
@@ -375,7 +376,10 @@ protected:
         }
         textoGuia(h_, IDC_CN_DNI, L"0801-1990-12345");
         textoGuia(h_, IDC_CN_TEL, L"9999-0000");
-        ponerTexto(h_, IDC_CN_INFO, "El cliente queda registrado como productor y se elige para este comprobante.");
+        if (tipo_ == CLIENTE_COMPRADOR) SetWindowTextW(h_, L"Registrar comprador nuevo");
+        ponerTexto(h_, IDC_CN_INFO, tipo_ == CLIENTE_COMPRADOR
+                                        ? "Queda registrado como comprador y se elige para esta venta. Puede usar DNI o RTN."
+                                        : "Queda registrado como productor y se elige para este documento.");
     }
 
     bool alAceptar() override {
@@ -386,7 +390,7 @@ protected:
         c.rtn = recortar(texto(h_, IDC_CN_RTN));
         c.carnet = recortar(texto(h_, IDC_CN_CARNET));
         c.direccion = recortar(texto(h_, IDC_CN_DIR));
-        c.tipo = CLIENTE_PRODUCTOR;
+        c.tipo = tipo_;
         if (c.nombre.empty()) {
             mostrarAviso(h_, "Escriba el nombre completo del cliente.");
             enfocar(h_, IDC_CN_NOMBRE);
@@ -399,12 +403,13 @@ protected:
 
 private:
     std::string texto_;
+    int tipo_ = CLIENTE_PRODUCTOR;
 };
 
 }  // namespace
 
-std::optional<Cliente> dialogoClienteNuevo(HWND padre, const std::string& texto) {
-    DialogoClienteNuevo d(texto);
+std::optional<Cliente> dialogoClienteNuevo(HWND padre, const std::string& texto, int tipo) {
+    DialogoClienteNuevo d(texto, tipo);
     if (d.mostrar(padre, IDD_CLIENTE_NUEVO) != IDOK) return std::nullopt;
     return d.resultado;
 }

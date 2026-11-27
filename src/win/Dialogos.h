@@ -38,6 +38,12 @@ protected:
         return 0;
     }
     HWND h_ = nullptr;
+    // Colores de texto de etiquetas por identificador.
+    std::map<int, COLORREF> coloresTexto_;
+    void colorTexto(int id, COLORREF c) {
+        coloresTexto_[id] = c;
+        InvalidateRect(GetDlgItem(h_, id), nullptr, TRUE);
+    }
 
 private:
     static INT_PTR CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp);

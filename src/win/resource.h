@@ -214,6 +214,13 @@
 #define IDC_V_LISTA 1620
 #define IDC_V_NUMERO 1621
 #define IDC_V_INFO 1622
+#define IDC_V_BUSCA 1623
+#define IDC_V_CLI_NOMBRE 1624
+#define IDC_V_CLI_DATOS 1625
+#define IDC_V_CLI_DEUDA 1626
+#define IDC_V_CLI_CAMBIAR 1627
+#define IDC_V_PERIODO 1628
+#define IDC_V_LBL_A 1629
 
 // ---------------------------------------------------------------- Reportes
 #define IDC_R_DESDE 1701
@@ -231,6 +238,9 @@
 #define IDC_R_INFO 1713
 #define IDC_R_INFORME 1714
 #define IDC_R_GENERAL 1715
+#define IDC_R_PERIODO 1716
+#define IDC_R_LBL_A 1717
+#define IDC_R_INVENTARIO 1718
 
 // ---------------------------------------------------------------- Configuración
 #define IDC_G_EMPRESA 1801
@@ -281,6 +291,10 @@
 #define IDC_N_CONCEPTO 2111
 #define IDC_N_CAJA 2112
 #define IDC_N_CAJA_INFO 2113
+#define IDC_N_BUSCA 2114
+#define IDC_N_CLI_NOMBRE 2115
+#define IDC_N_CLI_DEUDA 2116
+#define IDC_N_CLI_CAMBIAR 2117
 
 #define IDC_DD_INFO 2201
 #define IDC_DD_LISTA 2202

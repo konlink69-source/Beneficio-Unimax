@@ -68,6 +68,8 @@ public:
     std::string configEquipo(const std::string& clave, const std::string& defecto = "") const;
     void setConfigEquipo(const std::string& clave, const std::string& valor);
 
+    // Copia automática del día en Respaldos\Automáticos (se guardan las 30 más recientes).
+    void respaldoAutomatico();
     // Copia la base de datos a un archivo elegido por el usuario.
     void respaldar(HWND padre);
     void mostrarRecordatorio(HWND padre, bool forzado);

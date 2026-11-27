@@ -461,6 +461,29 @@ std::vector<Factura> Repositorio::facturas(const Fecha& desde, const Fecha& hast
     return r;
 }
 
+Inventario Repositorio::inventario(const Fecha& hasta) {
+    Inventario inv;
+    {
+        auto s = c_.preparar(
+            "SELECT d.TipoCafeId, SUM(d.Libras) FROM FacturaDetalle AS d INNER JOIN Facturas AS f ON d.FacturaId = f.Id "
+            "WHERE f.Anulada = 0 AND f.Fecha <= ? GROUP BY d.TipoCafeId");
+        s.pFecha(hasta).ejecutar();
+        while (s.siguiente()) {
+            const long t = s.entero(1);
+            if (t >= 1 && t <= NUM_TIPOS_CAFE) inv.comprado[t] = s.decimal(2);
+        }
+    }
+    {
+        auto s = c_.preparar("SELECT TipoCafeId, SUM(Libras) FROM Ventas WHERE Anulada = 0 AND Fecha <= ? GROUP BY TipoCafeId");
+        s.pFecha(hasta).ejecutar();
+        while (s.siguiente()) {
+            const long t = s.entero(1);
+            if (t >= 1 && t <= NUM_TIPOS_CAFE) inv.vendido[t] = s.decimal(2);
+        }
+    }
+    return inv;
+}
+
 std::vector<FilaCompra> Repositorio::detalleCompras(const Fecha& desde, const Fecha& hasta) {
     auto s = c_.preparar(
         "SELECT f.Numero, f.Fecha, c.Nombre, c.DNI, d.TipoCafeId, d.Libras, d.Galones, d.PrecioLibra, d.Subtotal, "

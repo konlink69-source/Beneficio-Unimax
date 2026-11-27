@@ -5,6 +5,7 @@
 #include "win/Excel.h"
 #include "win/Impresion.h"
 #include "win/Paginas.h"
+#include "win/Periodo.h"
 #include "win/resource.h"
 
 namespace bu::win {
@@ -16,16 +17,17 @@ public:
     const wchar_t* titulo() const override { return L"Reportes"; }
 
     void alIniciar() override {
-        configurarFecha(h_, IDC_R_DESDE);
-        configurarFecha(h_, IDC_R_HASTA);
-        esteMes();
+        periodo_.configurar(h_, IDC_R_PERIODO, IDC_R_DESDE, IDC_R_LBL_A, IDC_R_HASTA, PERIODO_MES);
         ponerTexto(h_, IDC_R_INFO, "Los documentos se guardan en:\n" + U(App::instancia().rutas().documentos));
         colorTexto(IDC_R_INFO, COLOR_GRIS);
     }
 
-    bool alComando(int id, int) override {
-        const Fecha desde = leerFecha(h_, IDC_R_DESDE);
-        const Fecha hasta = leerFecha(h_, IDC_R_HASTA);
+    void alMostrar() override { periodo_.actualizar(); }
+
+    bool alComando(int id, int codigo) override {
+        if (periodo_.comando(id, codigo)) return true;
+        const Fecha desde = periodo_.desde();
+        const Fecha hasta = periodo_.hasta();
         const bool necesitaPeriodo = id == IDC_R_COMPRAS || id == IDC_R_VENTAS || id == IDC_R_CAJA;
         if (necesitaPeriodo && hasta < desde) {
             mostrarAviso(h_, "La fecha \"Hasta\" no puede ser anterior a \"Desde\".");
@@ -34,19 +36,6 @@ public:
         Documento doc;
         bool generar = false;
         switch (id) {
-            case IDC_R_HOY:
-                ponerFecha(h_, IDC_R_DESDE, Fecha::hoy());
-                ponerFecha(h_, IDC_R_HASTA, Fecha::hoy());
-                return true;
-            case IDC_R_MES:
-                esteMes();
-                return true;
-            case IDC_R_MESANT: {
-                const Fecha fin = Fecha::hoy().primerDiaDelMes().sumarDias(-1);
-                ponerFecha(h_, IDC_R_DESDE, fin.primerDiaDelMes());
-                ponerFecha(h_, IDC_R_HASTA, fin);
-                return true;
-            }
             case IDC_R_COMPRAS:
                 generar = intentar(h_, [&] {
                     doc = docReporteCompras(repo().empresa(), desde, hasta, repo().facturas(desde, hasta),
@@ -71,6 +60,9 @@ public:
             case IDC_R_INFORME:
                 verInformeDia(h_, hasta);
                 return true;
+            case IDC_R_INVENTARIO:
+                verInventario(h_, hasta);
+                return true;
             case IDC_R_GENERAL:
                 generarReporteGeneral(h_, hasta);
                 return true;
@@ -85,10 +77,7 @@ public:
     }
 
 private:
-    void esteMes() {
-        ponerFecha(h_, IDC_R_DESDE, Fecha::hoy().primerDiaDelMes());
-        ponerFecha(h_, IDC_R_HASTA, Fecha::hoy());
-    }
+    SelectorPeriodo periodo_;
 };
 
 }  // namespace

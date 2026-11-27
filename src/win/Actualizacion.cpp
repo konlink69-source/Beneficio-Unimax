@@ -140,6 +140,7 @@ bool ofrecerActualizacion(HWND ventana, const InfoVersion& v, bool hayTrabajoSin
     }
 
     // Respaldo y liberar los datos antes de cerrar.
+    App::instancia().respaldoAutomatico();
     Nube::instancia().alSalir(ventana, "antes de actualizar");
 
     std::string notas = "Beneficio Unimax se actualizó a la versión " + std::to_string(v.numero) + ".\n\n";

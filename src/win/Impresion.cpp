@@ -13,6 +13,7 @@
 #include "core/Documentos.h"
 #include "core/Texto.h"
 #include "win/App.h"
+#include "win/Tema.h"
 #include "win/Excel.h"
 #include "win/resource.h"
 
@@ -308,13 +309,10 @@ void pintarVisor(HWND h, HDC dc, Visor* v) {
     HDC mem = CreateCompatibleDC(dc);
     HBITMAP bmp = CreateCompatibleBitmap(dc, std::max(1, w), std::max(1, alto));
     HGDIOBJ anterior = SelectObject(mem, bmp);
-    HBRUSH gris = CreateSolidBrush(RGB(96, 96, 96));
-    FillRect(mem, &cliente, gris);
-    DeleteObject(gris);
+    // Mismo estilo que la ventana principal: barra café arriba y fondo cálido detrás de la hoja.
+    FillRect(mem, &cliente, tema::pincel(RGB(226, 218, 206)));
     RECT barra{0, 0, w, altoBarra()};
-    HBRUSH crema = CreateSolidBrush(RGB(241, 234, 219));
-    FillRect(mem, &barra, crema);
-    DeleteObject(crema);
+    FillRect(mem, &barra, tema::pincel(tema::CAFE));
     if (v) {
         const int margen = px(14);
         const int disponibleW = w - 2 * margen, disponibleH = alto - altoBarra() - 2 * margen;
@@ -322,10 +320,11 @@ void pintarVisor(HWND h, HDC dc, Visor* v) {
             const double escala = std::min(disponibleW / v->lienzo.ancho, disponibleH / v->lienzo.alto);
             const int pw = L(v->lienzo.ancho * escala), ph = L(v->lienzo.alto * escala);
             const int x = (w - pw) / 2, y = altoBarra() + margen;
-            RECT sombra{x + px(4), y + px(4), x + pw + px(4), y + ph + px(4)};
-            HBRUSH negro = CreateSolidBrush(RGB(50, 50, 50));
-            FillRect(mem, &sombra, negro);
-            DeleteObject(negro);
+            for (int i = 4; i >= 1; --i) {  // sombra suave
+                RECT sombra{x - i + px(2), y - i + px(3), x + pw + i + px(2), y + ph + i + px(3)};
+                tema::rectRedondeado(mem, sombra, px(4) + i, RGB(226 - 8 * (5 - i), 218 - 8 * (5 - i), 206 - 8 * (5 - i)),
+                                     RGB(226 - 8 * (5 - i), 218 - 8 * (5 - i), 206 - 8 * (5 - i)));
+            }
             RECT hoja{x, y, x + pw, y + ph};
             FillRect(mem, &hoja, static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
             dibujarLienzo(mem, v->lienzo, hoja);
@@ -351,6 +350,9 @@ LRESULT CALLBACK procVisor(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 SendMessageW(b, WM_SETFONT, reinterpret_cast<WPARAM>(fuente(tamanoLetra() + 1, true)), TRUE);
                 v->controles.push_back(b);
             }
+            // Botones planos del estilo nuevo sobre la barra café.
+            tema::usarFondo(h, tema::CAFE);
+            tema::preparar(h);
             return 0;
         }
         case WM_SIZE: {
@@ -361,9 +363,12 @@ LRESULT CALLBACK procVisor(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 SetWindowPos(v->controles[i], nullptr, x, px(9), ancho, altoBarra() - px(18), SWP_NOZORDER);
                 x += ancho + px(8);
             }
+            tema::refrescar(h);
             InvalidateRect(h, nullptr, FALSE);
             return 0;
         }
+        case WM_DRAWITEM:
+            return tema::dibujarBoton(reinterpret_cast<const DRAWITEMSTRUCT*>(lp)) ? TRUE : FALSE;
         case WM_ERASEBKGND:
             return 1;
         case WM_PAINT: {
@@ -399,6 +404,7 @@ LRESULT CALLBACK procVisor(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             cerrarVisor(h, v);
             return 0;
         case WM_DESTROY:
+            tema::olvidar(h);
             if (v) v->cerrado = true;
             return 0;
         default:
@@ -504,6 +510,22 @@ void verInformeDia(HWND padre, const Fecha& dia) {
                        }});
     botones.push_back({L"Reporte general (Excel)", 200, [dia](HWND h) { generarReporteGeneral(h, dia); }});
     mostrarLienzo(padre, l, L"Informe del día " + W(dia.texto()), std::move(botones));
+}
+
+void verInventario(HWND padre, const Fecha& hasta) {
+    Lienzo l;
+    if (!intentar(padre, [&] { l = lienzoInventario(repo().empresa(), hasta, repo().inventario(hasta)); })) return;
+    std::vector<BotonVisor> botones;
+    botones.push_back({L"Imprimir", 110, [l, hasta](HWND h) {
+                           const std::wstring impresora = impresoraConfigurada();
+                           if (impresora.empty()) throw ErrorNegocio("No hay una impresora conectada.");
+                           std::string error;
+                           CursorEspera espera;
+                           if (!imprimirLienzo(l, impresora, 1, W("Café en bodega " + hasta.texto()), std::wstring(), error))
+                               throw std::runtime_error(error);
+                           mostrarInfo(h, "El reporte se envió a la impresora \"" + U(impresora) + "\".");
+                       }});
+    mostrarLienzo(padre, l, L"Café en bodega al " + W(hasta.texto()), std::move(botones));
 }
 
 void generarReporteGeneral(HWND padre, const Fecha& hasta) {

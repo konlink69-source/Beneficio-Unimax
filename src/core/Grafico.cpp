@@ -301,6 +301,77 @@ Lienzo lienzoInformeDia(const Empresa& e, const Fecha& dia, const ResumenDia& ho
     return l;
 }
 
+Lienzo lienzoInventario(const Empresa& e, const Fecha& hasta, const Inventario& inv) {
+    Lienzo l;
+    const double izq = 50, der = 800;
+    l.imagen(275, 28, 300, 115, "logo");
+    if (!e.lineaDatos().empty()) l.texto(izq, 148, der - izq, e.lineaDatos(), 9, false, GRIS, ALINEAR_CENTRO);
+    l.linea(izq, 178, der, 178, CAFE, 3);
+    l.texto(izq, 190, der - izq, "CAFÉ EN BODEGA", 20, true, NEGRO, ALINEAR_CENTRO);
+    l.texto(izq, 226, der - izq, "Al " + hasta.texto(), 13, false, CAFE, ALINEAR_CENTRO);
+
+    // Recuadros: uva y pergamino en bodega.
+    auto recuadro = [&](double x, const char* titulo, uint32_t color, double libras) {
+        l.rectangulo(x, 268, 360, 130, color);
+        l.texto(x, 280, 360, titulo, 15, true, BLANCO, ALINEAR_CENTRO);
+        l.texto(x, 310, 360, formatoDecimal(aQuintales(libras), 2) + " qq", 30, true, BLANCO, ALINEAR_CENTRO);
+        l.texto(x, 362, 360, formatoDecimal(libras, 2) + " libras", 13, false, BLANCO, ALINEAR_CENTRO);
+    };
+    recuadro(izq, "UVA EN BODEGA", UVA, inv.existencia(CAFE_UVA));
+    recuadro(440, "PERGAMINO EN BODEGA", PERGAMINO, inv.existencia(CAFE_HUMEDO) + inv.existencia(CAFE_SECO));
+
+    double y = 430;
+    const double col[] = {izq, 230, 325, 420, 515, 610, 705, der};
+    l.rectangulo(izq, y, der - izq, 26, CAFE);
+    const char* grupos[] = {"Comprado", "Vendido", "En bodega"};
+    for (int p = 0; p < 3; ++p) l.texto(col[1 + 2 * p], y + 5, col[3 + 2 * p] - col[1 + 2 * p], grupos[p], 9.5, true, BLANCO, ALINEAR_CENTRO);
+    y += 26;
+    l.rectangulo(izq, y, der - izq, 22, CREMA);
+    l.texto(col[0] + 8, y + 4, col[1] - col[0], "Tipo de café", 9.5, true, NEGRO);
+    for (int p = 0; p < 3; ++p) {
+        l.texto(col[1 + 2 * p], y + 4, col[2 + 2 * p] - col[1 + 2 * p] - 6, "Libras", 9.5, true, NEGRO, ALINEAR_DERECHA);
+        l.texto(col[2 + 2 * p], y + 4, col[3 + 2 * p] - col[2 + 2 * p] - 6, "Quintales", 9.5, true, NEGRO, ALINEAR_DERECHA);
+    }
+    y += 22;
+    const double inicioTabla = y - 48;
+    struct Fila {
+        const char* nombre;
+        int tipo;  // 0 = total
+    };
+    const Fila filas[] = {{"Uva", CAFE_UVA}, {"Pergamino húmedo", CAFE_HUMEDO}, {"Pergamino seco", CAFE_SECO}, {"Total", 0}};
+    for (const auto& f : filas) {
+        double v[3] = {0, 0, 0};
+        for (int t = 1; t <= NUM_TIPOS_CAFE; ++t) {
+            if (f.tipo && t != f.tipo) continue;
+            v[0] += inv.comprado[t];
+            v[1] += inv.vendido[t];
+            v[2] += inv.existencia(t);
+        }
+        const bool negrita = f.tipo == 0;
+        l.texto(col[0] + 8, y + 6, col[1] - col[0], f.nombre, 10.5, negrita, f.tipo == CAFE_UVA ? UVA : NEGRO);
+        for (int p = 0; p < 3; ++p) {
+            const uint32_t color = (p == 2 && v[2] < -0.005) ? 0xC00000 : NEGRO;
+            l.texto(col[1 + 2 * p], y + 6, col[2 + 2 * p] - col[1 + 2 * p] - 6, formatoDecimal(v[p], 2), 10.5,
+                    negrita || p == 2, color, ALINEAR_DERECHA);
+            l.texto(col[2 + 2 * p], y + 6, col[3 + 2 * p] - col[2 + 2 * p] - 6, formatoDecimal(aQuintales(v[p]), 2), 10.5,
+                    negrita || p == 2, color, ALINEAR_DERECHA);
+        }
+        y += 30;
+        l.linea(izq, y, der, y, GRIS_CLARO);
+    }
+    l.rectangulo(izq, inicioTabla, der - izq, y - inicioTabla, SIN_COLOR, GRIS, 1.2);
+    for (int i = 1; i < 7; i += 2) l.linea(col[i], inicioTabla, col[i], y, GRIS);
+    y += 20;
+    l.texto(izq, y, der - izq,
+            "Según las compras y ventas registradas (sin anuladas). No incluye mermas, secado ni el paso de uva a pergamino.",
+            9.5, false, GRIS);
+    l.texto(izq, y + 20, der - izq, "Si en bodega sale negativo (en rojo), se vendió más de lo que se registró como compra.",
+            9.5, false, GRIS);
+    l.linea(70, 960, 330, 960, NEGRO);
+    l.texto(70, 966, 260, "Revisado por", 10, false, NEGRO, ALINEAR_CENTRO);
+    return l;
+}
+
 // ================================================================ JSON (para revisar)
 namespace {
 std::string json(const std::string& s) {

@@ -5,6 +5,7 @@
 #include "win/Dialogos.h"
 #include "win/Excel.h"
 #include "win/Paginas.h"
+#include "win/Tema.h"
 #include "win/Sesion.h"
 #include "win/resource.h"
 
@@ -29,6 +30,7 @@ public:
         colorTexto(IDC_C_BUSCAR_LBL, COLOR_CAFE);
         ponerFuente(h_, IDC_C_BUSCAR, fuente(tamanoLetra() * 12.0 / 9.0, false));
         textoGuia(h_, IDC_C_BUSCAR, L"Escriba nombre, apellido, DNI, RTN o carnet");
+        tema::campoBusqueda(GetDlgItem(h_, IDC_C_BUSCAR));
         lvConfigurar(h_, IDC_C_LISTA,
                      {{L"Nombre", 140},
                       {L"DNI / RTN", 76},

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "core/Modelos.h"
+#include "core/Panel.h"
 
 namespace bu {
 
@@ -56,6 +57,8 @@ Lienzo lienzoComprobante(const Empresa& e, const Factura& f, const Cliente& c, i
                          int diseno = DISENO_COMPROBANTE_ACTUAL);
 
 // Informe del día: libras y quintales de uva y pergamino (hoy, el mes y la cosecha).
+// Café en bodega por tipo (compras menos ventas) hasta una fecha.
+Lienzo lienzoInventario(const Empresa& e, const Fecha& hasta, const Inventario& inv);
 Lienzo lienzoInformeDia(const Empresa& e, const Fecha& dia, const ResumenDia& hoy, const ResumenDia& mes,
                         const ResumenDia& cosecha, const Fecha& desdeCosecha);
 

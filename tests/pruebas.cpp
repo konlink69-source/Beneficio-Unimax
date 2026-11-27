@@ -4,6 +4,7 @@
 //
 //   pruebas                      -> ejecuta todo
 //   pruebas --nombres            -> imprime los nombres de celda que usa cada plantilla
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -407,6 +408,14 @@ static void pruebasPanel() {
     CHECK_EQ(montoCorto(125000000), std::string("L 1.25 M"));
     CHECK_EQ(formatoLibras(3250), std::string("3,250 lb"));
     CHECK_EQ(formatoLibras(1475.5), std::string("1,475.5 lb"));
+    // Períodos (el 27/11/2026 es viernes).
+    CHECK(rangoPeriodo(PERIODO_SEMANA, hoy).first == Fecha(2026, 11, 23));
+    CHECK(rangoPeriodo(PERIODO_SEMANA, Fecha(2026, 11, 23)).first == Fecha(2026, 11, 23));
+    CHECK(rangoPeriodo(PERIODO_MES_ANTERIOR, hoy).first == Fecha(2026, 10, 1));
+    CHECK(rangoPeriodo(PERIODO_MES_ANTERIOR, hoy).second == Fecha(2026, 10, 31));
+    CHECK(rangoPeriodo(PERIODO_COSECHA, Fecha(2027, 2, 3)).first == Fecha(2026, 10, 1));
+    CHECK(rangoPeriodo(PERIODO_ANIO, hoy).first == Fecha(2026, 1, 1));
+    CHECK(rangoPeriodo(PERIODO_HOY, hoy).first == hoy);
 }
 
 static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
@@ -635,6 +644,23 @@ static void pruebasRepositorio(db::Conexion& con, db::Dialecto dialecto) {
     CHECK_EQ(v.saldo, 1200000LL);
     CHECK_EQ(repo.ventas(hoy, hoy).size(), static_cast<size_t>(1));
     CHECK_EQ(repo.resumenDeudas(exportadora.id).porCobrar, 1200000LL);
+    {
+        // Inventario: lo comprado menos lo vendido.
+        const Inventario inv = repo.inventario(hoy);
+        double compradoSeco = 0, compradoHumedo = 0;
+        for (const auto& fc : repo.detalleCompras(Fecha(2000, 1, 1), hoy)) {
+            if (fc.linea.tipoCafe == CAFE_SECO) compradoSeco += fc.linea.libras;
+            if (fc.linea.tipoCafe == CAFE_HUMEDO) compradoHumedo += fc.linea.libras;
+        }
+        CHECK(std::fabs(inv.comprado[CAFE_SECO] - compradoSeco) < 1e-6);
+        CHECK(std::fabs(inv.vendido[CAFE_SECO] - 1000.0) < 1e-6);
+        CHECK(std::fabs(inv.existencia(CAFE_SECO) - (compradoSeco - 1000.0)) < 1e-6);
+        CHECK(std::fabs(inv.existencia(CAFE_HUMEDO) - compradoHumedo) < 1e-6);
+        CHECK(std::fabs(repo.inventario(hoy.sumarDias(-10)).total()) < 1e-6);
+        const Lienzo li = lienzoInventario(repo.empresa(), hoy, inv);
+        CHECK(li.elementos.size() > 20);
+        for (const auto& e : li.elementos) CHECK(e.x >= 0 && e.y >= 0 && e.x + e.ancho <= li.ancho + 0.01 && e.y + e.alto <= li.alto + 0.01);
+    }
 
     // --- Caja de hoy
     // Apertura 1000; préstamo de anteayer -2000 => saldo inicial de hoy = -1000.
@@ -841,6 +867,16 @@ int main(int argc, char** argv) {
             cos.libras[t] *= 41;
         }
         std::cout << lienzoJson(lienzoInformeDia(e, Fecha(2026, 11, 25), hoy, mes, cos, Fecha(2026, 10, 1)));
+        return 0;
+    }
+    if (argc > 1 && std::strcmp(argv[1], "--inventario") == 0) {
+        Empresa e;
+        Inventario inv;
+        inv.comprado[CAFE_UVA] = 133250;
+        inv.comprado[CAFE_HUMEDO] = 33620;
+        inv.comprado[CAFE_SECO] = 60495;
+        inv.vendido[CAFE_SECO] = 45000;
+        std::cout << lienzoJson(lienzoInventario(e, Fecha(2026, 11, 27), inv));
         return 0;
     }
     if (argc > 1 && std::strcmp(argv[1], "--nombres") == 0) {

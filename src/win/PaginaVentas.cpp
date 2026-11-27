@@ -3,7 +3,9 @@
 
 #include "core/Texto.h"
 #include "win/App.h"
+#include "win/Buscador.h"
 #include "win/Dialogos.h"
+#include "win/Periodo.h"
 #include "win/Paginas.h"
 #include "win/Sesion.h"
 #include "win/resource.h"
@@ -18,26 +20,22 @@ public:
 
     void alIniciar() override {
         controlEstirable_ = IDC_V_LISTA;
-        comprador_.configurar(h_, IDC_V_DNI, IDC_V_NOMBRE, 0, IDC_V_INFO, CLIENTE_COMPRADOR);
-        for (int id : {IDC_V_FECHA, IDC_V_VENCE, IDC_V_DESDE, IDC_V_HASTA}) configurarFecha(h_, id);
-        ponerFecha(h_, IDC_V_DESDE, Fecha::hoy().primerDiaDelMes());
-        ponerFecha(h_, IDC_V_HASTA, Fecha::hoy());
+        comprador_.configurar(
+            h_, IDC_V_BUSCA, IDC_V_CLI_NOMBRE, IDC_V_CLI_DATOS, IDC_V_CLI_DEUDA, IDC_V_CLI_CAMBIAR,
+            [this](int id, COLORREF c) { colorTexto(id, c); }, [this] { enfocar(h_, IDC_V_CANTIDAD); }, CLIENTE_COMPRADOR);
+        for (int id : {IDC_V_FECHA, IDC_V_VENCE}) configurarFecha(h_, id);
+        periodo_.configurar(h_, IDC_V_PERIODO, IDC_V_DESDE, IDC_V_LBL_A, IDC_V_HASTA, PERIODO_MES);
         for (int t = 1; t <= NUM_TIPOS_CAFE; ++t) comboAgregar(h_, IDC_V_TIPO, nombreTipoCafe(t), t);
         comboAgregar(h_, IDC_V_UNIDAD, "Libras", static_cast<LPARAM>(Unidad::Libras));
         comboAgregar(h_, IDC_V_UNIDAD, "Quintales", static_cast<LPARAM>(Unidad::Quintales));
         lvConfigurar(h_, IDC_V_LISTA,
-                     {{L"No.", 30},
-                      {L"Fecha", 50},
-                      {L"Comprador", 110},
-                      {L"DNI / RTN", 74},
-                      {L"Tipo", 66},
-                      {L"Libras", 56, true},
-                      {L"Quintales", 46, true},
-                      {L"Precio/lb", 46, true},
-                      {L"Total", 66, true},
-                      {L"Recibido", 66, true},
-                      {L"Saldo", 60, true},
-                      {L"Estado", 46}});
+                     {{L"No.", 34},
+                      {L"Fecha", 56},
+                      {L"Comprador", 150},
+                      {L"Tipo", 80},
+                      {L"Quintales", 60, true},
+                      {L"Total", 80, true},
+                      {L"Por cobrar", 76, true}});
         ponerFuente(h_, IDC_V_TOTAL, fuenteNegrita());
         ponerFuente(h_, IDC_V_NUMERO, fuenteNegrita());
         colorTexto(IDC_V_TOTAL, COLOR_CAFE);
@@ -45,16 +43,19 @@ public:
     }
 
     void alMostrar() override {
+        comprador_.recargar();
+        periodo_.actualizar();
         ponerTexto(h_, IDC_V_NUMERO, std::to_string(repo().siguienteNumeroVenta()));
         listar();
     }
 
     bool alComando(int id, int codigo) override {
         if (comprador_.comando(id, codigo)) return true;
+        if (periodo_.comando(id, codigo)) {
+            listar();
+            return true;
+        }
         switch (id) {
-            case IDC_V_BUSCAR:
-                comprador_.elegir();
-                return true;
             case IDC_V_CANTIDAD:
             case IDC_V_PRECIO:
                 if (codigo == EN_CHANGE) actualizarTotal();
@@ -71,9 +72,6 @@ public:
             case IDC_V_LIMPIAR:
                 limpiar();
                 return true;
-            case IDC_V_LISTAR:
-                listar();
-                return true;
             case IDC_V_ANULAR:
                 anular();
                 return true;
@@ -83,7 +81,7 @@ public:
     }
 
     bool alNotificar(NMHDR* nm, LRESULT& r) override {
-        if ((nm->idFrom == IDC_V_DESDE || nm->idFrom == IDC_V_HASTA) && nm->code == DTN_DATETIMECHANGE) {
+        if (periodo_.notificacion(nm)) {
             listar();
             r = 0;
             return true;
@@ -93,7 +91,10 @@ public:
     }
 
     void alAceptar() override {
-        if (comprador_.alPresionarEnter()) return;
+        if (comprador_.tieneFoco()) {
+            comprador_.alPresionarEnter();
+            return;
+        }
         guardar();
     }
 
@@ -125,11 +126,11 @@ private:
         for (int id : {IDC_V_CANTIDAD, IDC_V_PRECIO, IDC_V_RECIBIDO, IDC_V_OBS}) ponerTexto(h_, id, "");
         recibidoEditado_ = false;
         actualizarTotal();
-        enfocar(h_, IDC_V_DNI);
+        enfocar(h_, IDC_V_BUSCA);
     }
 
     void listar() {
-        ventas_ = repo().ventas(leerFecha(h_, IDC_V_DESDE), leerFecha(h_, IDC_V_HASTA));
+        ventas_ = repo().ventas(periodo_.desde(), periodo_.hasta());
         lvLimpiar(h_, IDC_V_LISTA);
         colores_.clear();
         double libras = 0;
@@ -137,10 +138,9 @@ private:
         int n = 0;
         for (const auto& v : ventas_) {
             lvAgregar(h_, IDC_V_LISTA,
-                      {std::to_string(v.numero), v.fecha.texto(), v.clienteNombre, v.clienteDni, nombreTipoCafe(v.tipoCafe),
-                       formatoDecimal(v.libras, 2), formatoDecimal(aQuintales(v.libras), 2), formatoPrecio(v.precioLibra),
-                       formatoLempiras(v.total), formatoLempiras(v.recibido), formatoLempiras(v.saldo),
-                       v.anulada ? "ANULADA" : "Válida"},
+                      {std::to_string(v.numero), v.fecha.texto(), v.clienteNombre, nombreTipoCafe(v.tipoCafe),
+                       formatoDecimal(aQuintales(v.libras), 2), formatoLempiras(v.total),
+                       v.anulada ? "Anulada" : (v.saldo > 0 ? formatoLempiras(v.saldo) : "Cobrado")},
                       v.id);
             if (v.anulada) {
                 colores_[v.id] = COLOR_GRIS;
@@ -175,8 +175,12 @@ private:
             enfocar(h_, IDC_V_RECIBIDO);
             return;
         }
-        Cliente c;
-        if (!intentar(h_, [&] { c = comprador_.obtenerORegistrar(); })) return;
+        if (!comprador_.cliente()) {
+            mostrarAviso(h_, "Busque y elija el comprador (escriba su nombre, DNI o RTN en el buscador).");
+            enfocar(h_, IDC_V_BUSCA);
+            return;
+        }
+        const Cliente c = *comprador_.cliente();
         Venta v;
         v.clienteId = c.id;
         v.fecha = leerFecha(h_, IDC_V_FECHA);
@@ -226,7 +230,8 @@ private:
         }
     }
 
-    EntradaCliente comprador_;
+    BuscadorCliente comprador_;
+    SelectorPeriodo periodo_;
     std::vector<Venta> ventas_;
     std::map<LPARAM, COLORREF> colores_;
     bool recibidoEditado_ = false;

@@ -3,6 +3,7 @@
 #include "core/Identificacion.h"
 #include "core/Texto.h"
 #include "win/App.h"
+#include "win/Buscador.h"
 #include "win/Excel.h"
 #include "win/Sesion.h"
 #include "win/Tema.h"
@@ -61,7 +62,9 @@ INT_PTR CALLBACK DialogoModal::proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (!self) return FALSE;
             const INT_PTR propio = self->alColor(msg, reinterpret_cast<HDC>(wp), reinterpret_cast<HWND>(lp));
             if (propio) return propio;
-            return tema::colorControl(h, msg, reinterpret_cast<HDC>(wp), reinterpret_cast<HWND>(lp), tema::TEXTO);
+            const auto it = self->coloresTexto_.find(GetDlgCtrlID(reinterpret_cast<HWND>(lp)));
+            return tema::colorControl(h, msg, reinterpret_cast<HDC>(wp), reinterpret_cast<HWND>(lp),
+                                      it == self->coloresTexto_.end() ? tema::TEXTO : it->second);
         }
         case WM_ERASEBKGND:
             if (tema::pintarFondo(h, reinterpret_cast<HDC>(wp))) {
@@ -317,8 +320,9 @@ private:
 class DlgNuevaDeuda : public DialogoModal {
 protected:
     void alIniciar() override {
-        cliente_.configurar(h_, IDC_N_DNI, IDC_N_NOMBRE, 0, IDC_N_INFO, CLIENTE_PRODUCTOR);
-        cliente_.limpiar();
+        cliente_.configurar(
+            h_, IDC_N_BUSCA, IDC_N_CLI_NOMBRE, IDC_N_INFO, IDC_N_CLI_DEUDA, IDC_N_CLI_CAMBIAR,
+            [this](int id, COLORREF c) { colorTexto(id, c); }, [this] { enfocar(h_, IDC_N_MONTO); });
         CheckRadioButton(h_, IDC_N_PORCOBRAR, IDC_N_PORPAGAR, IDC_N_PORCOBRAR);
         for (const char* o : {"Préstamo", "Adelanto", "Deuda anterior", "Otro"}) comboAgregar(h_, IDC_N_ORIGEN, o, 0);
         SendDlgItemMessageW(h_, IDC_N_ORIGEN, CB_SETCURSEL, 0, 0);
@@ -328,14 +332,11 @@ protected:
         ponerFechaOpc(h_, IDC_N_VENCE, std::nullopt);
         CheckDlgButton(h_, IDC_N_CAJA, BST_CHECKED);
         actualizarInfoCaja();
-        enfocar(h_, IDC_N_DNI);
+        enfocar(h_, IDC_N_BUSCA);
     }
     bool alComando(int id, int codigo) override {
         if (cliente_.comando(id, codigo)) return true;
         switch (id) {
-            case IDC_N_BUSCAR:
-                cliente_.elegir();
-                return true;
             case IDC_N_PORCOBRAR:
             case IDC_N_PORPAGAR:
             case IDC_N_CAJA:
@@ -353,12 +354,16 @@ protected:
         }
     }
     bool alAceptar() override {
-        if (cliente_.alPresionarEnter()) return false;
+        if (cliente_.tieneFoco()) {
+            cliente_.alPresionarEnter();
+            return false;
+        }
         bool cancelado = false;
         const bool ok = intentar(h_, [&] {
             const auto monto = leerMonto(h_, IDC_N_MONTO);
             if (!monto || *monto <= 0) throw ErrorNegocio("Escriba un monto válido mayor que cero.");
-            Cliente c = cliente_.obtenerORegistrar();
+            if (!cliente_.cliente()) throw ErrorNegocio("Busque y elija el cliente (escriba su nombre o DNI).");
+            const Cliente c = *cliente_.cliente();
             Deuda d;
             d.clienteId = c.id;
             d.tipo = porCobrar() ? TipoDeuda::PorCobrar : TipoDeuda::PorPagar;
@@ -400,7 +405,7 @@ private:
                      : "No mueve la caja (por ejemplo, algo que el beneficio ya debía antes de usar el programa).";
         ponerTexto(h_, IDC_N_CAJA_INFO, t);
     }
-    EntradaCliente cliente_;
+    BuscadorCliente cliente_;
 };
 
 // ================================================================ Abono

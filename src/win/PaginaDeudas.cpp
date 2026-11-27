@@ -5,6 +5,7 @@
 #include "win/Dialogos.h"
 #include "win/Excel.h"
 #include "win/Paginas.h"
+#include "win/Tema.h"
 #include "win/Sesion.h"
 #include "win/resource.h"
 
@@ -37,6 +38,8 @@ public:
                       {L"Monto", 62, true},
                       {L"Saldo", 62, true},
                       {L"Estado", 80}});
+        textoGuia(h_, IDC_D_FILTRO, L"Buscar cliente o DNI...");
+        tema::campoBusqueda(GetDlgItem(h_, IDC_D_FILTRO));
         ponerFuente(h_, IDC_D_RESUMEN, fuenteNegrita());
         colorTexto(IDC_D_RESUMEN, COLOR_CAFE);
     }
@@ -51,9 +54,6 @@ public:
                 return true;
             case IDC_D_FILTRO:
                 if (codigo == EN_CHANGE) mostrarLista();
-                return true;
-            case IDC_D_BUSCAR:
-                cargar();
                 return true;
             case IDC_D_NUEVA:
                 if (dialogoNuevaDeuda(h_)) cargar();

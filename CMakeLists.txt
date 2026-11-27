@@ -73,6 +73,7 @@ if(WIN32)
         src/win/Paginas.cpp
         src/win/PaginaInicio.cpp
         src/win/Buscador.cpp
+        src/win/Periodo.cpp
         src/win/Tema.cpp
         src/win/PaginaFactura.cpp
         src/win/PaginaFacturas.cpp

@@ -44,6 +44,9 @@ struct Ventana {
     HMENU menuEmergente = nullptr;
     std::vector<std::pair<RECT, int>> zonas;  // partes donde se puede hacer clic
     int encima = -1;                          // zona bajo el ratón
+    bool compacto = false;                    // menú lateral solo con íconos (pantallas pequeñas)
+    HWND ayuda = nullptr;                     // globos con el nombre de cada ícono (menú compacto)
+    bool ayudaPendiente = true;               // hay que volver a crear los globos
 };
 
 Ventana g;
@@ -67,7 +70,9 @@ int escala(int valor) {
 }
 
 int altoBarra() { return escala(64); }
-int anchoMenu() { return escala(236); }
+int anchoMenu() { return g.compacto ? escala(68) : escala(236); }
+// En pantallas o ventanas angostas el menú lateral muestra solo los íconos.
+bool debeSerCompacto(int anchoCliente) { return anchoCliente < escala(1280); }
 int margenContenido() { return escala(18); }
 
 // ------------------------------------------------ Menú lateral
@@ -119,6 +124,7 @@ void elegirTamanoLetra() {
     HWND temporal = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 10, 10, nullptr, nullptr,
                                     App::instancia().hInst, nullptr);
     int elegido = 8;
+    g.compacto = debeSerCompacto(trabajo.right - trabajo.left);
     for (int puntos = 14; puntos >= 8; --puntos) {
         const int disponibleW = (trabajo.right - trabajo.left) - 2 * bordeX - anchoMenu() - 2 * margenContenido();
         const int disponibleH = (trabajo.bottom - trabajo.top) - GetSystemMetrics(SM_CYCAPTION) - 2 * bordeY -
@@ -217,7 +223,15 @@ void pintarMarco(HWND h, HDC dc) {
     // ---- Barra superior café
     RECT rb{0, 0, r.right, barra};
     FillRect(dc, &rb, tema::pincel(tema::CAFE));
-    if (g.logo && g.logoAlto > 0) {
+    if (g.compacto) {
+        // Solo el ícono del programa.
+        const int lado = std::min(barra - escala(20), menu - escala(20));
+        HICON icono = static_cast<HICON>(LoadImageW(App::instancia().hInst, MAKEINTRESOURCEW(IDI_APP), IMAGE_ICON, lado, lado, 0));
+        if (icono) {
+            DrawIconEx(dc, (menu - lado) / 2, (barra - lado) / 2, icono, lado, lado, 0, nullptr, DI_NORMAL);
+            DestroyIcon(icono);
+        }
+    } else if (g.logo && g.logoAlto > 0) {
         const int la = barra - escala(14);
         const int an = MulDiv(g.logoAncho, la, g.logoAlto);
         HDC mem = CreateCompatibleDC(dc);
@@ -285,12 +299,19 @@ void pintarMarco(HWND h, HDC dc) {
     int y = barra + escala(14);
     for (const auto& it : ITEMS) {
         if (it.grupo) {
-            y += escala(10);
-            RECT rg{escala(24), y, menu - escala(12), y + escala(20)};
-            tema::texto(dc, it.grupo, rg, fGrupo, RGB(170, 155, 142), DT_LEFT | DT_VCENTER);
-            y += escala(22);
+            if (g.compacto) {
+                y += escala(8);
+                RECT sep{escala(16), y, menu - escala(16), y + 1};
+                FillRect(dc, &sep, tema::pincel(tema::BORDE));
+                y += escala(9);
+            } else {
+                y += escala(10);
+                RECT rg{escala(24), y, menu - escala(12), y + escala(20)};
+                tema::texto(dc, it.grupo, rg, fGrupo, RGB(170, 155, 142), DT_LEFT | DT_VCENTER);
+                y += escala(22);
+            }
         }
-        RECT ri{escala(10), y, menu - escala(10), y + altoItem};
+        RECT ri{escala(g.compacto ? 8 : 10), y, menu - escala(g.compacto ? 8 : 10), y + altoItem};
         const bool elegido = it.pagina == g.actual, sobre = it.pagina == g.encima;
         if (elegido) {
             tema::rectRedondeado(dc, ri, escala(8), tema::SELECCION, tema::SELECCION);
@@ -301,7 +322,7 @@ void pintarMarco(HWND h, HDC dc) {
         }
         const COLORREF color = elegido ? tema::CAFE : tema::TEXTO;
         if (iconos) {
-            RECT ric{ri.left + escala(14), ri.top, ri.left + escala(44), ri.bottom};
+            RECT ric = g.compacto ? ri : RECT{ri.left + escala(14), ri.top, ri.left + escala(44), ri.bottom};
             HGDIOBJ a = SelectObject(dc, iconos);
             SetBkMode(dc, TRANSPARENT);
             SetTextColor(dc, elegido ? tema::CAFE : tema::CAFE_CLARO);
@@ -309,8 +330,10 @@ void pintarMarco(HWND h, HDC dc) {
             DrawTextW(dc, ic, 1, &ric, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             SelectObject(dc, a);
         }
-        RECT rtx{ri.left + (iconos ? escala(52) : escala(18)), ri.top, ri.right - escala(8), ri.bottom};
-        tema::texto(dc, it.nombre, rtx, elegido ? fItemSel : fItem, color, DT_LEFT | DT_VCENTER);
+        if (!g.compacto || !iconos) {
+            RECT rtx{ri.left + (iconos ? escala(52) : escala(8)), ri.top, ri.right - escala(8), ri.bottom};
+            tema::texto(dc, it.nombre, rtx, elegido ? fItemSel : fItem, color, DT_LEFT | DT_VCENTER);
+        }
         g.zonas.push_back({ri, it.pagina});
         y += altoItem + escala(2);
     }
@@ -318,7 +341,19 @@ void pintarMarco(HWND h, HDC dc) {
     const std::string nube = Nube::instancia().resumen();
     const int altoNube = escala(58);
     RECT rn{escala(10), r.bottom - altoNube - escala(26), menu - escala(10), r.bottom - escala(26)};
-    if (rn.top > y + escala(10)) {
+    if (g.compacto && rn.top > y + escala(10)) {
+        RECT rc{escala(8), r.bottom - escala(60), menu - escala(8), r.bottom - escala(14)};
+        if (g.encima == ZONA_NUBE) tema::rectRedondeado(dc, rc, escala(8), RGB(250, 246, 240), RGB(250, 246, 240));
+        if (iconos) {
+            HGDIOBJ a = SelectObject(dc, iconos);
+            SetTextColor(dc, Nube::instancia().soloConsulta() ? tema::AMBAR
+                             : (nube.find("al día") != std::string::npos ? tema::VERDE : tema::CAFE_CLARO));
+            const wchar_t ic[2] = {0xE753, 0};
+            DrawTextW(dc, ic, 1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            SelectObject(dc, a);
+        }
+        g.zonas.push_back({rc, ZONA_NUBE});
+    } else if (rn.top > y + escala(10)) {
         if (g.encima == ZONA_NUBE) tema::rectRedondeado(dc, rn, escala(8), RGB(250, 246, 240), RGB(250, 246, 240));
         if (iconos) {
             RECT ric{rn.left + escala(14), rn.top, rn.left + escala(44), rn.bottom};
@@ -339,6 +374,48 @@ void pintarMarco(HWND h, HDC dc) {
         RECT rv{escala(24), r.bottom - escala(24), menu - escala(12), r.bottom - escala(6)};
         tema::texto(dc, "Versión " + std::to_string(VERSION_PROGRAMA), rv, fuente(std::max(7, tamanoLetra() - 2), false),
                     RGB(175, 162, 150), DT_LEFT | DT_VCENTER);
+    }
+}
+
+// Menú compacto: un globo con el nombre de cada ícono al pasar el ratón.
+void actualizarAyuda(HWND h) {
+    if (!g.ayudaPendiente) return;
+    g.ayudaPendiente = false;
+    if (!g.ayuda) {
+        g.ayuda = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr, WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX,
+                                  CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, h, nullptr,
+                                  App::instancia().hInst, nullptr);
+        SendMessageW(g.ayuda, WM_SETFONT, reinterpret_cast<WPARAM>(fuente(tamanoLetra(), false)), FALSE);
+    }
+    // Se quitan los globos anteriores.
+    TTTOOLINFOW ti{};
+    ti.cbSize = sizeof ti;
+    while (SendMessageW(g.ayuda, TTM_ENUMTOOLSW, 0, reinterpret_cast<LPARAM>(&ti))) SendMessageW(g.ayuda, TTM_DELTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
+    if (!g.compacto) return;
+    static std::vector<std::wstring> textos;
+    textos.clear();
+    for (const auto& z : g.zonas) {
+        std::string nombre;
+        for (const auto& it : ITEMS)
+            if (it.pagina == z.second) nombre = it.nombre;
+        if (z.second == ZONA_NUBE) nombre = "Google Drive: " + Nube::instancia().resumen();
+        if (nombre.empty()) continue;
+        textos.push_back(W(nombre));
+    }
+    size_t i = 0;
+    for (const auto& z : g.zonas) {
+        bool tiene = z.second == ZONA_NUBE;
+        for (const auto& it : ITEMS)
+            if (it.pagina == z.second) tiene = true;
+        if (!tiene || i >= textos.size()) continue;
+        TTTOOLINFOW t{};
+        t.cbSize = sizeof t;
+        t.uFlags = TTF_SUBCLASS;
+        t.hwnd = h;
+        t.uId = static_cast<UINT_PTR>(z.second + 1);
+        t.rect = z.first;
+        t.lpszText = const_cast<LPWSTR>(textos[i++].c_str());
+        SendMessageW(g.ayuda, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&t));
     }
 }
 
@@ -465,7 +542,10 @@ bool hayTrabajoSinGuardar() {
 void cerrarPrograma(HWND h) {
     if (hayTrabajoSinGuardar() && !confirmar(h, "Hay un comprobante a medio llenar que no se ha guardado.\n\n¿Salir de todas formas?"))
         return;
-    if (!g.datosGuardados) Nube::instancia().alSalir(h, "al salir");
+    if (!g.datosGuardados) {
+        App::instancia().respaldoAutomatico();
+        Nube::instancia().alSalir(h, "al salir");
+    }
     g.datosGuardados = true;
     DestroyWindow(h);
 }
@@ -499,9 +579,13 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_CLOSE:
             cerrarPrograma(h);
             return 0;
-        case WM_SIZE:
+        case WM_SIZE: {
+            const bool compacto = debeSerCompacto(LOWORD(lp));
+            if (compacto != g.compacto) g.compacto = compacto;
+            g.ayudaPendiente = true;
             if (g.paginas[0]) ubicarPaginas(h);
             return 0;
+        }
         case WM_ERASEBKGND:
             return 1;  // todo se pinta en WM_PAINT (sin parpadeo)
         case WM_PAINT: {
@@ -514,6 +598,7 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             HGDIOBJ anterior = SelectObject(mem, bmp);
             pintarMarco(h, mem);
             BitBlt(dc, 0, 0, r.right, r.bottom, mem, 0, 0, SRCCOPY);
+            actualizarAyuda(h);
             SelectObject(mem, anterior);
             DeleteObject(bmp);
             DeleteDC(mem);
@@ -591,7 +676,10 @@ LRESULT CALLBACK procVentana(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 case IDM_CERRAR_SESION:
                     ShowWindow(h, SW_HIDE);
                     if (!iniciarSesion(nullptr)) {
-                        if (!g.datosGuardados) Nube::instancia().alSalir(nullptr, "al salir");
+                        if (!g.datosGuardados) {
+                            App::instancia().respaldoAutomatico();
+                            Nube::instancia().alSalir(nullptr, "al salir");
+                        }
                         g.datosGuardados = true;
                         DestroyWindow(h);
                         return 0;

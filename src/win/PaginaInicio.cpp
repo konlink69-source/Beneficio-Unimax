@@ -18,7 +18,7 @@ constexpr COLORREF COLOR_HUMEDO = tema::CAFE_CLARO;
 constexpr COLORREF COLOR_SECO = tema::CAFE;
 constexpr COLORREF COLOR_PERGAMINO = tema::CAFE_CLARO;
 
-enum Zona { Z_UVA = 1, Z_PERGAMINO, Z_CAJA, Z_DEUDAS, Z_GRAFICO, Z_TIPOS, Z_VENCIMIENTOS, Z_PRODUCTORES };
+enum Zona { Z_UVA = 1, Z_PERGAMINO, Z_CAJA, Z_DEUDAS, Z_GRAFICO, Z_TIPOS, Z_VENCIMIENTOS, Z_PRODUCTORES, Z_BODEGA };
 
 int px(int v) {
     static const int ppp = [] {
@@ -41,6 +41,7 @@ public:
         saldoCaja_ = caja_.cierre ? caja_.cierre->efectivoContado : caja_.esperado;
         minimo_ = App::instancia().minimoCaja();
         rec_ = repo().recordatorio(hoy);
+        inventario_ = repo().inventario(hoy);
         cargado_ = true;
         InvalidateRect(h_, nullptr, FALSE);
     }
@@ -77,8 +78,12 @@ public:
         // ---- Fila 3: vencimientos y mejores productores
         const int y3 = y2 + alto2 + g;
         if (alto3 > px(90)) {
-            vencimientos(dc, {0, y3, anchoGrafico, H});
-            productores(dc, {anchoGrafico + g, y3, W, H});
+            // Tres tarjetas: vencimientos, café en bodega y mejores productores.
+            const int anchoV = (W - 2 * g) * 40 / 100;
+            const int anchoB = (W - 2 * g - anchoV) / 2;
+            vencimientos(dc, {0, y3, anchoV, H});
+            bodega(dc, {anchoV + g, y3, anchoV + g + anchoB, H});
+            productores(dc, {anchoV + 2 * g + anchoB, y3, W, H});
         }
         // Logo del beneficio de fondo, tenue, encima de todo (como en las demás pestañas).
         if (App::instancia().marcaAgua() != 0) tema::logoMarca(dc, area);
@@ -119,6 +124,7 @@ public:
                 case Z_GRAFICO:
                 case Z_TIPOS: App::instancia().irAPagina(PAG_REPORTES); break;
                 case Z_PRODUCTORES: App::instancia().irAPagina(PAG_CLIENTES); break;
+                case Z_BODEGA: verInventario(h_, Fecha::hoy()); break;
                 default: break;
             }
             return true;
@@ -380,6 +386,34 @@ private:
         }
     }
 
+    void bodega(HDC dc, const RECT& r) {
+        marco(dc, r, Z_BODEGA);
+        const int pad = px(18);
+        int y = tituloTarjeta(dc, r, "Café en bodega") + px(8);
+        struct Fila {
+            const char* nombre;
+            double libras;
+            COLORREF color;
+        };
+        const Fila filas[] = {{"Uva", inventario_.existencia(CAFE_UVA), COLOR_UVA},
+                              {"Pergamino húmedo", inventario_.existencia(CAFE_HUMEDO), COLOR_HUMEDO},
+                              {"Pergamino seco", inventario_.existencia(CAFE_SECO), COLOR_SECO}};
+        const int altoNombre = tema::altoTexto(dc, f(1.0, false)), altoLb = tema::altoTexto(dc, f(0.85, false));
+        for (const auto& fila : filas) {
+            if (y + altoNombre + altoLb > r.bottom - px(8)) break;
+            tema::circulo(dc, r.left + pad + px(5), y + altoNombre / 2, px(5), fila.color);
+            RECT rn{r.left + pad + px(18), y, r.right - pad, y + altoNombre};
+            tema::texto(dc, fila.nombre, rn, f(1.0, false), tema::TEXTO);
+            tema::texto(dc, formatoDecimal(aQuintales(fila.libras), 2) + " qq", rn, f(1.0, true),
+                        fila.libras < -0.005 ? tema::ROJO : tema::TEXTO, DT_RIGHT);
+            RECT rl{rn.left, rn.bottom, rn.right, rn.bottom + altoLb};
+            tema::texto(dc, formatoLibras(fila.libras), rl, f(0.85, false), tema::TEXTO_SUAVE, DT_RIGHT);
+            y = rl.bottom + px(6);
+        }
+        RECT rp{r.left + pad, r.bottom - px(10) - altoLb, r.right - pad, r.bottom - px(10)};
+        if (rp.top > y) tema::texto(dc, "Compras menos ventas registradas", rp, f(0.85, false), tema::TEXTO_SUAVE);
+    }
+
     void productores(HDC dc, const RECT& r) {
         marco(dc, r, Z_PRODUCTORES);
         const int pad = px(18);
@@ -415,6 +449,7 @@ private:
     Centavos saldoCaja_ = 0;
     Centavos minimo_ = 0;
     Recordatorio rec_;
+    Inventario inventario_;
     bool cargado_ = false;
     std::vector<std::pair<RECT, int>> zonas_;
     int encima_ = 0;
